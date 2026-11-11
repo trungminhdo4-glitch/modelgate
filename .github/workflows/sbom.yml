@@ -18,7 +18,7 @@ jobs:
         run: node ci/sbom.mjs --out sbom.cdx.json --tool-version "${GITHUB_SHA::12}"
       - name: show component count
         run: node -e "const b=require('./sbom.cdx.json'); console.log(b.bomFormat, b.specVersion, b.components.length+' components')"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
