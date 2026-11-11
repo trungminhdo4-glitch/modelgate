@@ -1,0 +1,21 @@
+# yamllint configuration for this repository.
+#
+# Extends the default profile with three explicit decisions:
+#   line-length max 320  - issue-template descriptions, workflow step lines and
+#                          the Sigma test fixture (internal/report/testdata)
+#                          are single-line by format; the fixture line is 296
+#                          characters and must stay byte-stable for tests.
+#                          The rule stays ON - 320 is a hard limit.
+#   document-start off   - GitHub issue forms and Sigma fixtures are consumed
+#                          by parsers that do not require a YAML document
+#                          marker; adding one would churn fixtures.
+#   truthy check-keys off - GitHub Actions uses the bare key `on:`; it is not
+#                          a boolean value and must not be flagged.
+extends: default
+
+rules:
+  line-length:
+    max: 320
+  document-start: disable
+  truthy:
+    check-keys: false
