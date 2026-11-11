@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/trung-dev/modelgate/internal/scan"
+	"github.com/trungminhdo4-glitch/modelgate/internal/scan"
 )
 
 // Sigma renders the ModelGate rule catalogue as a Sigma YAML rule. The rule

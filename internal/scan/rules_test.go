@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trung-dev/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
 )
 
 func hasRule(fs []finding.Finding, rule string) bool {

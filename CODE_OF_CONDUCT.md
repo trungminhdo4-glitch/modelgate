@@ -61,7 +61,7 @@ appointed representative at an online or offline event.
 
 Instances of abusive, harassing, or otherwise unacceptable behavior may be
 reported to the community leaders responsible for enforcement through
-[GitHub Security Advisories for this repository](https://github.com/trung-dev/modelgate/security/advisories/new).
+[GitHub Security Advisories for this repository](https://github.com/trungminhdo4-glitch/modelgate/security/advisories/new).
 All complaints will be reviewed and investigated promptly and fairly.
 
 All community leaders are obligated to respect the privacy and security of the

@@ -59,5 +59,5 @@ Hugging Face repositories.
   NOTICE, TRANSPARENCY, APPEAL, RELEASING; issue and pull request templates;
   Dependabot configuration.
 
-[Unreleased]: https://github.com/trung-dev/modelgate/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/trung-dev/modelgate/releases/tag/v0.1.0
+[Unreleased]: https://github.com/trungminhdo4-glitch/modelgate/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/trungminhdo4-glitch/modelgate/releases/tag/v0.1.0

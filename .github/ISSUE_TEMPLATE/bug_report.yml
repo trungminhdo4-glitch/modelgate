@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         **Security-relevant reports must not use this form.**
-        Use [GitHub Security Advisories](https://github.com/trung-dev/modelgate/security/advisories/new)
+        Use [GitHub Security Advisories](https://github.com/trungminhdo4-glitch/modelgate/security/advisories/new)
         instead (see [SECURITY.md](../blob/main/SECURITY.md)).
   - type: input
     id: version

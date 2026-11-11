@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"github.com/trung-dev/modelgate/internal/cli"
+	"github.com/trungminhdo4-glitch/modelgate/internal/cli"
 )
 
 // version is injected at build time:

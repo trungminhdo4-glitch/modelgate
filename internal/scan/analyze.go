@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/hf"
-	"github.com/trung-dev/modelgate/internal/pin"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/pin"
 )
 
 // Default limits bound memory and runtime on hostile repositories.
@@ -156,7 +156,7 @@ func checkPin(ctx context.Context, f hf.Fetcher, opts Options, rev string, tree 
 			Title:       "Pinned revision verified",
 			Message:     fmt.Sprintf("Upstream serves exactly the pinned revision %s.", shortSHA(rev)),
 			Remediation: "Keep the pin updated on your own review cadence.",
-			References:  []string{"https://github.com/trung-dev/modelgate#commit-sha-pinning"},
+			References:  []string{"https://github.com/trungminhdo4-glitch/modelgate#commit-sha-pinning"},
 		}}, nil
 	}
 
@@ -194,7 +194,7 @@ func checkPin(ctx context.Context, f hf.Fetcher, opts Options, rev string, tree 
 		Title:       "Upstream revision differs from pin",
 		Message:     msg,
 		Remediation: "Re-run the review against the current revision and update the pin only after approval.",
-		References:  []string{"https://github.com/trung-dev/modelgate#commit-sha-pinning"},
+		References:  []string{"https://github.com/trungminhdo4-glitch/modelgate#commit-sha-pinning"},
 	}}, nil
 }
 

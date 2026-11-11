@@ -3,8 +3,8 @@ package pin
 import (
 	"testing"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
 )
 
 func TestDiffTrees(t *testing.T) {

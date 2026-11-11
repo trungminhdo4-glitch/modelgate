@@ -5,8 +5,8 @@ package pin
 import (
 	"sort"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
 )
 
 // Change types for repository files.

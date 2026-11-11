@@ -5,7 +5,7 @@ import (
 	"io"
 	"strings"
 
-	"github.com/trung-dev/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
 )
 
 // Text renders the human-readable report. Findings are grouped by severity,

@@ -1,3 +1,3 @@
-module github.com/trung-dev/modelgate
+module github.com/trungminhdo4-glitch/modelgate
 
 go 1.27

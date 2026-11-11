@@ -42,7 +42,7 @@ policy change through a pull request instead.
 ## How to file
 
 Open a **private** report through
-[GitHub Security Advisories](https://github.com/trung-dev/modelgate/security/advisories/new)
+[GitHub Security Advisories](https://github.com/trungminhdo4-glitch/modelgate/security/advisories/new)
 with:
 
 * the reference of the original decision (issue, advisory, or PR number),

@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/hf"
-	"github.com/trung-dev/modelgate/internal/report"
-	"github.com/trung-dev/modelgate/internal/sbom"
-	"github.com/trung-dev/modelgate/internal/scan"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/report"
+	"github.com/trungminhdo4-glitch/modelgate/internal/sbom"
+	"github.com/trungminhdo4-glitch/modelgate/internal/scan"
 )
 
 // Exit codes (documented in the README).

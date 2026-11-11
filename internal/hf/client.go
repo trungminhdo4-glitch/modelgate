@@ -164,7 +164,7 @@ func NewClient(baseURL string, timeout time.Duration) (*Client, error) {
 	return &Client{
 		base:      base,
 		hc:        &http.Client{Timeout: timeout},
-		userAgent: "modelgate/readonly (+https://github.com/trung-dev/modelgate)",
+		userAgent: "modelgate/readonly (+https://github.com/trungminhdo4-glitch/modelgate)",
 	}, nil
 }
 

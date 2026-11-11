@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/trung-dev/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
 )
 
 // SARIF renders the report as SARIF 2.1.0, the CI-native format understood

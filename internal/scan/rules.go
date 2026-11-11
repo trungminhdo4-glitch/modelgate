@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/trung-dev/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
 )
 
 // pyRule describes one static detection rule for Python source.

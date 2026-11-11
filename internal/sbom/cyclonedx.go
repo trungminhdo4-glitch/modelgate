@@ -10,7 +10,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/scan"
+	"github.com/trungminhdo4-glitch/modelgate/internal/scan"
 )
 
 // SpecVersion of the CycloneDX specification used here.

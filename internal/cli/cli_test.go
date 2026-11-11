@@ -16,8 +16,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/hf"
-	"github.com/trung-dev/modelgate/internal/testserver"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/testserver"
 )
 
 const (

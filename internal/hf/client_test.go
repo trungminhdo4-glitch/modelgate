@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/testserver"
+	"github.com/trungminhdo4-glitch/modelgate/internal/testserver"
 )
 
 func TestValidateRepoID(t *testing.T) {

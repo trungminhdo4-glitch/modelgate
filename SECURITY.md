@@ -3,7 +3,7 @@
 ## Reporting a vulnerability
 
 Report vulnerabilities **privately** through
-[GitHub Security Advisories](https://github.com/trung-dev/modelgate/security/advisories/new)
+[GitHub Security Advisories](https://github.com/trungminhdo4-glitch/modelgate/security/advisories/new)
 for this repository. Do **not** open a public issue for security-relevant
 reports.
 

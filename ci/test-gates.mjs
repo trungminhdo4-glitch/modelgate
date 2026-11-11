@@ -112,7 +112,7 @@ test("dco rejects a mismatched sign-off", () => {
 test("sbom builds a valid CycloneDX 1.6 document", () => {
   const bom = buildBom(
     [
-      { Path: "github.com/trung-dev/modelgate", Version: "", Main: true },
+      { Path: "github.com/trungminhdo4-glitch/modelgate", Version: "", Main: true },
       { Path: "golang.org/x/text", Version: "v0.14.0" },
     ],
     { serial: "11111111-2222-3333-4444-555555555555", timestamp: "2026-11-11T12:00:00Z", toolVersion: "1.0.0" },
@@ -141,7 +141,7 @@ test("sbom CLI writes a parseable document", () => {
     );
     const bom = JSON.parse(readFileSync(outPath, "utf8"));
     assert.deepEqual(validateBom(bom), []);
-    assert.ok(bom.components.some((c) => c.name === "github.com/trung-dev/modelgate"));
+    assert.ok(bom.components.some((c) => c.name === "github.com/trungminhdo4-glitch/modelgate"));
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

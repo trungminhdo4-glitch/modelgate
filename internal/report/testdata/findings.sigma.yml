@@ -3,7 +3,7 @@ id: 51adbb42-3a7f-5e43-9696-4fdc0cda6b6a
 status: experimental
 description: 'Static detection catalogue emitted by ModelGate 1.0.0 after checking fixture/benign at revision rev01abcdef0. The keywords are review signatures for Hugging Face repository source files; the rule is meant for log or file scanning pipelines and is not executable against any system.'
 references:
-  - 'https://github.com/trung-dev/modelgate'
+  - 'https://github.com/trungminhdo4-glitch/modelgate'
   - 'https://huggingface.co/fixture/benign'
 author: 'trung-dev'
 date: 2026-11-11

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trung-dev/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
 )
 
 var updateGolden = flag.Bool("update", false, "rewrite golden files")

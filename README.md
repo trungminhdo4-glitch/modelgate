@@ -153,7 +153,7 @@ Verfasser und werden von ModelGate nur gelesen, nicht verändert.
 ## Installation
 
 ```console
-$ go install github.com/trung-dev/modelgate/cmd/modelgate@latest
+$ go install github.com/trungminhdo4-glitch/modelgate/cmd/modelgate@latest
 $ modelgate version
 modelgate 0.1.0
 ```
@@ -240,13 +240,13 @@ See [NOTICE](NOTICE) for the exact split.
 
 <!-- Badges last, after purpose, dual-use, AUP, disclaimer and support policy. -->
 
-[![CI](https://github.com/trung-dev/modelgate/actions/workflows/ci.yml/badge.svg)](https://github.com/trung-dev/modelgate/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/trung-dev/modelgate/actions/workflows/codeql.yml/badge.svg)](https://github.com/trung-dev/modelgate/actions/workflows/codeql.yml)
-[![Gitleaks](https://github.com/trung-dev/modelgate/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/trung-dev/modelgate/actions/workflows/gitleaks.yml)
-[![SBOM](https://github.com/trung-dev/modelgate/actions/workflows/sbom.yml/badge.svg)](https://github.com/trung-dev/modelgate/actions/workflows/sbom.yml)
-[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25%20core-brightgreen)](https://github.com/trung-dev/modelgate/actions/workflows/ci.yml)
+[![CI](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/ci.yml/badge.svg)](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/codeql.yml/badge.svg)](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/codeql.yml)
+[![Gitleaks](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/gitleaks.yml/badge.svg)](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/gitleaks.yml)
+[![SBOM](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/sbom.yml/badge.svg)](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/sbom.yml)
+[![Coverage](https://img.shields.io/badge/coverage-%E2%89%A580%25%20core-brightgreen)](https://github.com/trungminhdo4-glitch/modelgate/actions/workflows/ci.yml)
 [![Go](https://img.shields.io/badge/go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev/)
 [![License: Code](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![License: Rules](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](LICENSE-CC-BY-4.0.txt)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/trung-dev/modelgate/badge)](https://securityscorecards.dev/viewer/?uri=github.com/trung-dev/modelgate)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/trungminhdo4-glitch/modelgate/badge)](https://securityscorecards.dev/viewer/?uri=github.com/trungminhdo4-glitch/modelgate)
 [![DCO](https://img.shields.io/badge/DCO-required-green.svg)](CONTRIBUTING.md)

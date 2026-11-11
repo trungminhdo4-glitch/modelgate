@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/hf"
-	"github.com/trung-dev/modelgate/internal/scan"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/hf"
+	"github.com/trungminhdo4-glitch/modelgate/internal/scan"
 )
 
 var fixedTime = time.Date(2026, 11, 11, 12, 0, 0, 0, time.UTC)

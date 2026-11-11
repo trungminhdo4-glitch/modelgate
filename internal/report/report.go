@@ -7,16 +7,16 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/trung-dev/modelgate/internal/finding"
-	"github.com/trung-dev/modelgate/internal/pin"
-	"github.com/trung-dev/modelgate/internal/scan"
+	"github.com/trungminhdo4-glitch/modelgate/internal/finding"
+	"github.com/trungminhdo4-glitch/modelgate/internal/pin"
+	"github.com/trungminhdo4-glitch/modelgate/internal/scan"
 )
 
 // SchemaVersion of the JSON report format.
 const SchemaVersion = "1.0"
 
 // DefaultHomepage is used in every export that references the project.
-const DefaultHomepage = "https://github.com/trung-dev/modelgate"
+const DefaultHomepage = "https://github.com/trungminhdo4-glitch/modelgate"
 
 // Exit codes documented in the README.
 const (
