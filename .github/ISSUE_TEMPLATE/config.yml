@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability or abuse report
+    url: https://github.com/trung-dev/modelgate/security/advisories/new
+    about: Report a vulnerability or policy violation privately (48-hour acknowledgement, see SECURITY.md)
+  - name: Acceptable use and ethics policy
+    url: https://github.com/trung-dev/modelgate/blob/main/ETHICS.md
+    about: Read the defensive-only scope before proposing a contribution

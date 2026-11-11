@@ -1,0 +1,7 @@
+{
+  "model_type": "fixture_benign",
+  "architectures": ["FixtureModel"],
+  "auto_map": {
+    "AutoModel": "modeling_clean.FixtureModel"
+  }
+}

@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: build-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: gofmt (must be clean)
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "gofmt needed on:"; echo "$out"; exit 1
+          fi
+      - name: go vet
+        run: go vet ./...
+      - name: unit + acceptance tests
+        run: go test ./... -count=1
+      - name: fuzz smoke (every parser, seed corpus + 5s each)
+        run: |
+          set -e
+          for spec in \
+            ./internal/cli:FuzzSplitArgs \
+            ./internal/scan:FuzzMaskPython \
+            ./internal/scan:FuzzParseConfig \
+            ./internal/scan:FuzzResolveAutoMapPath \
+            ./internal/scan:FuzzAnalyzePython \
+            ./internal/scan:FuzzCountCardMentions \
+            ./internal/hf:FuzzParseMeta \
+            ./internal/hf:FuzzParseTree
+          do
+            pkg=${spec%%:*}
+            fn=${spec##*:}
+            echo "== $fn"
+            go test "$pkg" -run '^$' -fuzz "$fn" -fuzztime 5s
+          done
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: coverage gate (core packages >= 80%)
+        run: |
+          go test ./internal/cli ./internal/finding ./internal/hf ./internal/pin \
+                   ./internal/report ./internal/sbom ./internal/scan \
+            -coverprofile coverage.out -covermode=atomic
+          total=$(go tool cover -func=coverage.out | tail -n 1 | awk '{print $3}' | tr -d '%')
+          echo "core coverage: ${total}%"
+          awk -v t="$total" 'BEGIN { if (t + 0 < 80) { print "coverage below the 80% gate"; exit 1 } }'
+
+  gates:
+    name: gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: gate unit tests (node:test, offline)
+        run: node --test ci/test-gates.mjs
+      - name: keyword + scope gate
+        run: node ci/check-keywords.mjs
+      - name: CycloneDX SBOM (must validate)
+        run: node ci/sbom.mjs --out sbom.cdx.json
+
+  dco:
+    name: dco
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Developer Certificate of Origin
+        run: node ci/check-dco.mjs "origin/${{ github.base_ref }}"

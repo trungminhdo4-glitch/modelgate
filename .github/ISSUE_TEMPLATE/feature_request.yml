@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a new rule, output format, or improvement
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind of change
+      options:
+        - New detection rule
+        - New output format or integration
+        - Performance or robustness improvement
+        - Documentation
+        - CI / governance
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What defensive use case does this serve?
+      placeholder: "A class of risky repositories that today reports as clean is …"
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should ModelGate do?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or references
+      description: Public write-ups, rule references, or sample repository IDs that demonstrate the need
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: This request is defensive only (detection, hardening, forensics) and adds no exploit, payload, phishing, C2, or capture capability
+          required: true
+        - label: I have read ETHICS.md and the dual-use section of the README
+          required: true

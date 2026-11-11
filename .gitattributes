@@ -1,0 +1,8 @@
+# Normalise line endings: golden-file tests and gofmt output are LF-based,
+# and CI runs on Linux regardless of where a contributor checks out.
+* text=auto eol=lf
+
+# Binary fixtures must never be converted.
+*.png binary
+*.jpg binary
+*.pdf binary

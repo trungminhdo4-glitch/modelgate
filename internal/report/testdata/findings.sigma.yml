@@ -1,0 +1,70 @@
+title: 'ModelGate dangerous pattern catalogue - fixture/benign'
+id: 51adbb42-3a7f-5e43-9696-4fdc0cda6b6a
+status: experimental
+description: 'Static detection catalogue emitted by ModelGate 1.0.0 after checking fixture/benign at revision rev01abcdef0. The keywords are review signatures for Hugging Face repository source files; the rule is meant for log or file scanning pipelines and is not executable against any system.'
+references:
+  - 'https://github.com/trung-dev/modelgate'
+  - 'https://huggingface.co/fixture/benign'
+author: 'trung-dev'
+date: 2026-11-11
+tags:
+  - attack.t1041
+  - attack.t1059.006
+  - attack.t1095
+  - attack.t1106
+  - attack.t1562.001
+logsource:
+  category: file_scan
+  product: modelgate
+detection:
+  sel_mg_cmd_001:
+    - 'os.system('
+    - 'os.popen('
+    - 'os.exec'
+  sel_mg_cmd_002:
+    - 'subprocess.Popen('
+    - 'subprocess.run('
+    - 'subprocess.check_output('
+  sel_mg_deser_001:
+    - 'pickle.loads('
+    - 'marshal.loads('
+    - 'shelve.open('
+  sel_mg_deser_002:
+    - 'torch.load('
+  sel_mg_enc_001:
+    - 'b64decode('
+    - 'base64.b64decode('
+    - 'binascii.a2b_base64('
+  sel_mg_enc_002:
+    - 'b64decode('
+    - 'eval('
+    - 'exec('
+  sel_mg_exec_001:
+    - 'eval('
+    - 'builtins.eval('
+  sel_mg_exec_002:
+    - 'exec('
+    - 'builtins.exec('
+  sel_mg_exec_003:
+    - '__import__('
+  sel_mg_lib_001:
+    - 'ctypes.CDLL('
+    - 'ctypes.windll('
+  sel_mg_net_001:
+    - 'requests.post('
+    - 'httpx.post('
+    - '.sendmail('
+    - '.storbinary('
+  sel_mg_net_002:
+    - 'urllib.request.urlopen('
+    - 'socket.socket('
+    - 'aiohttp.ClientSession('
+  sel_mg_net_003:
+    - 'discord.com/api/webhooks'
+    - 'hooks.slack.com/services'
+    - 'webhook.site'
+  condition: 1 of sel_*
+falsepositives:
+  - Reviewed research code that legitimately uses dynamic evaluation
+  - Vendor model code that was audited and pinned by the consumer
+level: high

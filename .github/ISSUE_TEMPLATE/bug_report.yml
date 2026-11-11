@@ -1,0 +1,57 @@
+name: Bug report
+description: ModelGate misbehaved — wrong findings, crash, or unexpected behaviour
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Security-relevant reports must not use this form.**
+        Use [GitHub Security Advisories](https://github.com/trung-dev/modelgate/security/advisories/new)
+        instead (see [SECURITY.md](../blob/main/SECURITY.md)).
+  - type: input
+    id: version
+    attributes:
+      label: ModelGate version
+      description: Output of `modelgate version`
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Command line
+      description: The exact command you ran (no tokens or private repository names you cannot share)
+      placeholder: "modelgate check org/model --format json"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Output, exit code, and whether it is reproducible
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version (if built from source), installation method
+      placeholder: "Windows 11, go1.27.4, go install"
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checks
+      options:
+        - label: This is not a security vulnerability (those go through Security Advisories)
+          required: true
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: The behaviour respects the disclaimer in the README (heuristic findings need manual review)
+          required: false

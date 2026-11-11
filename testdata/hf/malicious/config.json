@@ -1,0 +1,7 @@
+{
+  "model_type": "fixture_malicious",
+  "trust_remote_code": true,
+  "auto_map": {
+    "AutoModel": "remote_code.FixtureRemote"
+  }
+}

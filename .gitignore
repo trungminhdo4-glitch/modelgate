@@ -1,0 +1,25 @@
+# Build output
+/bin/
+/dist/
+/modelgate
+/modelgate.exe
+
+# Test / coverage artifacts
+coverage.out
+coverage.html
+*.test
+*.prof
+*.fuzz
+
+# Secrets — never commit
+.env
+.env.*
+*.pem
+*.key
+*.p12
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

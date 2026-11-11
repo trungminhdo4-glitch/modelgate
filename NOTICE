@@ -1,0 +1,56 @@
+ModelGate
+Copyright trung-dev
+
+This product includes software developed by trung-dev
+(https://github.com/trung-dev).
+
+================================================================================
+LICENCE SPLIT
+================================================================================
+
+1. CODE (all *.go files, the build and CI configuration, scripts under ci/,
+   and the Go module as a whole) is licensed under the Apache License,
+   Version 2.0. The full text is in the file LICENSE.
+
+2. CONTENT (detection rules and rule metadata, test fixtures under testdata/,
+   documentation *.md files, issue and pull request templates, and any
+   IOC-like or detection-engineering material in this repository) is licensed
+   under the Creative Commons Attribution 4.0 International Licence (CC BY
+   4.0). The full text is in the file LICENSE-CC-BY-4.0.txt.
+
+   You may use the content commercially, adapt it, and redistribute it, as
+   long as you give attribution to trung-dev and indicate whether you changed
+   it. Attribution must include the repository name and URL:
+   "ModelGate — github.com/trung-dev/modelgate".
+
+   When the two licences meet in one file, the more restrictive notice in
+   that file's header applies; absent a header, the split above controls.
+
+================================================================================
+THIRD-PARTY MATERIAL
+================================================================================
+
+ModelGate contains no vendored third-party Go code (the module has no
+external dependencies).
+
+Test fixtures under testdata/ are synthetic, written for this project. They
+contain no third-party content and no real credentials.
+
+Model and dataset content referenced at runtime (for example Hugging Face
+repository metadata, model cards, and file trees) is fetched read-only from
+the upstream service and remains the property of its respective authors under
+their own licences. ModelGate does not modify, republish, or claim any rights
+over that content.
+
+"Hugging Face" is a trademark of Hugging Face, Inc. This project is not
+affiliated with, endorsed by, or sponsored by Hugging Face, Inc.
+
+================================================================================
+ATTRIBUTION FOR REDISTRIBUTIONS
+================================================================================
+
+Redistributions of the code must retain the Apache-2.0 header information
+required by Section 4 of the Apache License 2.0.
+
+Redistributions of the content (rules, fixtures, documentation) must include
+the attribution described in section 2 above.

@@ -1,0 +1,25 @@
+name: SBOM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  cyclonedx:
+    name: cyclonedx-1.6
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: generate SBOM (fails closed on invalid output)
+        run: node ci/sbom.mjs --out sbom.cdx.json --tool-version "${GITHUB_SHA::12}"
+      - name: show component count
+        run: node -e "const b=require('./sbom.cdx.json'); console.log(b.bomFormat, b.specVersion, b.components.length+' components')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          if-no-files-found: error
