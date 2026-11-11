@@ -16,10 +16,51 @@ any step fails, stop and do not tag.
 
 ## Support window
 
-* Security fixes land on the latest MAJOR line.
-* Each MAJOR line is supported for **6 months after the next MAJOR release**,
-  then declared end-of-life (EOL) in the README and CHANGELOG.
+* **Support window (best effort).** Each MAJOR line is intended to receive
+  security fixes for 6 months after the next MAJOR release, then declared
+  end-of-life (EOL) in the README and CHANGELOG. This is a best-effort
+  intention of a non-commercial project, not a binding commitment or SLA;
+  a shorter window may be announced in the CHANGELOG when capacity requires
+  it.
 * EOL versions receive no backports, including for disclosed vulnerabilities.
+
+## Repository bootstrap (fresh clone)
+
+A fresh clone becomes green with one command:
+
+```console
+$ node ci/bootstrap.mjs            # go mod download + tool preflight + full gate run
+$ node ci/bootstrap.mjs --offline  # re-run without module download (air-gapped)
+```
+
+The script executes a fixed step plan (`go mod download` unless `--offline`,
+tool preflight, `gofmt -l`, `go vet`, `go test ./... -count=1`, gate unit
+tests, keyword gate). A missing required tool (`go`, `node`, `gitleaks`,
+`actionlint`, `yamllint`) fails closed with exit 2 and a pointer to the
+machine tool registry (`school/tool-registry`); a failing step exits 1.
+Step semantics are pinned by `ci/test-bootstrap.mjs`.
+
+## Reproducible repository initialization
+
+The repository layout was created with this command set; re-creating it
+(mirror, fork recovery) follows the same order:
+
+```console
+$ git init -b main
+$ git config user.name  "trung-dev"
+$ git config user.email "trung-dev@users.noreply.github.com"  # == DCO email
+$ # layout, in commit order:
+$ #   cmd/<tool>/            entry point (wiring only)
+$ #   internal/<7 pkgs>/     core packages + internal/testserver fixture
+$ #   ci/                    test-gates, check-keywords, check-dco, sbom, bootstrap
+$ #   .github/workflows/     ci, codeql, dependency-review, gitleaks, sbom, scorecard
+$ #   testdata/              inert fixtures
+$ #   governance docs        README, SECURITY, ETHICS, CONTRIBUTING (+ DCO),
+$ #                          CODE_OF_CONDUCT, NOTICE, TRANSPARENCY, APPEAL,
+$ #                          CHANGELOG, RELEASING, LICENSE, LICENSE-CC-BY-4.0.txt
+$ git add -A && git commit -s -m "initial import"
+$ node ci/bootstrap.mjs && git status --short   # must end green and clean
+```
 
 ## Release checklist
 

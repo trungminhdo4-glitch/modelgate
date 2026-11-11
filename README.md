@@ -135,9 +135,14 @@ Verfasser und werden von ModelGate nur gelesen, nicht verändert.
 * **Semantic Versioning:** `MAJOR.MINOR.PATCH`. The report schema
   (`schema_version`), rule IDs, exit codes and CLI flags are part of the public
   contract; breaking any of them requires a MAJOR bump.
-* **Support window:** each MAJOR line receives security fixes for **6 months**
-  after the next MAJOR release; after that it is end-of-life (EOL) and receives
-  no further updates, including for newly disclosed vulnerabilities.
+* **Support window (best effort):** each MAJOR line is *intended* to receive
+  security fixes for about **6 months** after the next MAJOR release; after
+  that it is declared end-of-life (EOL) and receives no further updates,
+  including for newly disclosed vulnerabilities. This is a best-effort
+  intention of a non-commercial, volunteer-run project - not a binding
+  promise, warranty or SLA. If capacity changes, the window may be shorter;
+  the CHANGELOG and [RELEASING.md](RELEASING.md) carry the authoritative
+  statement at any time.
 * **No SLA:** releases happen as capacity allows; there is no guaranteed
   response or delivery time for features.
 * **Release signing:** release artifacts and the SBOM are produced by CI;
@@ -202,6 +207,8 @@ internal/pin/         commit-pin diffing
 internal/report/      text, JSON, Sigma and SARIF renderers
 internal/sbom/        CycloneDX 1.6 SBOM builder
 internal/testserver/  GET-only fixture endpoint used by the tests
+                      (test infrastructure, deliberately outside the
+                      coverage gate - see CONTRIBUTING.md)
 ci/                   blocking CI gates (keywords, DCO, SBOM) + their tests
 testdata/             inert fixtures, including the spy tripwire
 .github/workflows/    CI, CodeQL, dependency-review, gitleaks, SBOM, Scorecard

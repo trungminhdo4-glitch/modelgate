@@ -29,7 +29,15 @@ Signed-off-by: Your Name <your.email@example.com>
 
 The name and email must match your Git identity (`git config user.name` /
 `git config user.email`). Commits without a matching sign-off fail the blocking
-`dco` CI job — see `ci/check-dco.mjs`.
+`dco` CI job - see `ci/check-dco.mjs`.
+
+**Decision (identity vs. DCO check):** the repository-local Git identity is
+`trung-dev <trung-dev@users.noreply.github.com>` and the DCO check stays
+configured against the *author email of each commit* rather than against a
+hard-coded address. Reason: the identity already equals the DCO sign-off email,
+so no re-identification was needed, and a per-commit comparison keeps the gate
+correct for contributor commits while validating maintainers with the same
+logic - one rule, no special case, and no permission model to drift.
 
 If you have commits that are already unsigned:
 
@@ -60,6 +68,11 @@ $ go test ./internal/cli ./internal/finding ./internal/hf ./internal/pin \
          -coverprofile coverage.out -covermode=atomic
 $ go tool cover -func coverage.out | tail -n 1
 ```
+
+The `internal/testserver` package is deliberately outside that list: it is a
+GET-only fixture endpoint that exists purely as test infrastructure, not as
+product code, so it carries no coverage requirement of its own. Its absence
+from the seven core packages is intentional and is not a coverage gap.
 
 Workspace-level check (when working in the agent workspace):
 

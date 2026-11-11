@@ -71,7 +71,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: gate unit tests (node:test, offline)
-        run: node --test ci/test-gates.mjs
+        run: node --test ci/test-gates.mjs ci/test-bootstrap.mjs
       - name: keyword + scope gate
         run: node ci/check-keywords.mjs
       - name: CycloneDX SBOM (must validate)
