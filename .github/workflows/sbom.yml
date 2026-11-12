@@ -13,7 +13,7 @@ jobs:
     name: cyclonedx-1.6
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: generate SBOM (fails closed on invalid output)
         run: node ci/sbom.mjs --out sbom.cdx.json --tool-version "${GITHUB_SHA::12}"
       - name: show component count
