@@ -38,6 +38,10 @@ signing and support policy.
 * Bootstrap executed `go mod download` before its own tool preflight, so a
   missing `go` exited 1 with a raw `ENOENT` instead of the documented
   exit 2.
+* `recipeHint()` now fails closed (throws) when no tool registry path is
+  known instead of returning a hint line containing a placeholder
+  (`node undefined recipe ...`); `discoverRegistry()` is pinned by a
+  deterministic temp-root test covering both directions.
 
 ## [0.1.0] - 2026-11-11
 

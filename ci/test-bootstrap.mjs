@@ -8,7 +8,7 @@
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import process from "node:process";
@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import {
   REQUIRED_TOOLS,
   describeMissing,
+  discoverRegistry,
   main,
   planSteps,
   recipeHint,
@@ -88,6 +89,34 @@ test("recipeHint names the machine-readable registry", () => {
   );
   assert.match(hint, /tool-registry/);
   assert.match(hint, /gitleaks/);
+});
+
+test("recipeHint fails closed instead of rendering a placeholder path", () => {
+  assert.throws(() => recipeHint("gitleaks", null), /registry|tool/);
+});
+
+test("recipeHint without an explicit path follows discoverRegistry", () => {
+  const discovered = discoverRegistry();
+  if (discovered === null) {
+    assert.throws(() => recipeHint("gitleaks"), /registry|tool/);
+    return;
+  }
+  const hint = recipeHint("gitleaks");
+  assert.ok(hint.includes(discovered), hint);
+  assert.doesNotMatch(hint, /undefined|\bnull\b/, hint);
+});
+
+test("discoverRegistry probes the given root for the registry file", () => {
+  const root = mkdtempSync(join(tmpdir(), "mg-registry-"));
+  try {
+    assert.equal(discoverRegistry(root), null);
+    const dir = join(root, "Dev", "school", "tool-registry");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "registry.mjs"), "");
+    assert.equal(discoverRegistry(root), join(dir, "registry.mjs"));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("cli entry point answers --help with usage and exit 0", () => {

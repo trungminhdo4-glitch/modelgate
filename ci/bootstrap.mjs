@@ -48,7 +48,15 @@ export function discoverRegistry(
   return existsSync(candidate) ? candidate : null;
 }
 
-export function recipeHint(tool, registryPath) {
+/**
+ * One install-hint line for the machine tool registry. Fails closed instead
+ * of rendering "node undefined recipe ..." when no registry is known - callers
+ * (describeMissing) only reach this inside their own `registryPath` guard.
+ */
+export function recipeHint(tool, registryPath = discoverRegistry()) {
+  if (!registryPath) {
+    throw new Error(`recipeHint(${tool}): no tool registry on this machine`);
+  }
   return `node ${registryPath} recipe ${tool}`;
 }
 
