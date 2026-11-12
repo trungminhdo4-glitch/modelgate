@@ -1,28 +1,35 @@
 // test-bootstrap.mjs - tests for the reproducible bootstrap plan (node:test).
 //
 // TDD contract: bootstrap must be a deterministic, ordered step plan:
-// module download (unless offline) -> tool preflight -> format -> vet ->
+// tool preflight -> module download (unless offline) -> format -> vet ->
 // tests -> gate tests -> keyword gate. Missing required tools fail closed
-// with exit 2 and a pointer to the tool-registry recipe - never silently.
+// with exit 2 and a concrete install hint - never silently, and with the
+// same exit code in every mode.
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import path from "node:path";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
 import process from "node:process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
   REQUIRED_TOOLS,
   describeMissing,
+  main,
   planSteps,
   recipeHint,
 } from "./bootstrap.mjs";
 
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+
 test("planSteps (online) is ordered and complete", () => {
   const ids = planSteps({ offline: false }).map((s) => s.id);
   assert.deepEqual(ids, [
-    "go-mod-download",
     "tool-preflight",
+    "go-mod-download",
     "gofmt",
     "go-vet",
     "go-test",
@@ -57,22 +64,36 @@ test("required tool set covers every external gate dependency", () => {
 
 test("missing tools fail closed with registry recipe hint", () => {
   const missing = ["gitleaks", "actionlint"];
-  const msg = describeMissing(missing);
+  const msg = describeMissing(missing, {
+    registryPath: join("w", "Dev", "school", "tool-registry", "registry.mjs"),
+  });
   assert.match(msg, /gitleaks/);
   assert.match(msg, /actionlint/);
   assert.match(msg, /tool-registry/);
   assert.match(msg, /registry\.mjs recipe/);
 });
 
+test("without a machine registry the hint falls back to RELEASING.md", () => {
+  const msg = describeMissing(["go"], { registryPath: null });
+  assert.match(msg, /missing required tools: go/);
+  assert.match(msg, /install/);
+  assert.match(msg, /RELEASING\.md/);
+  assert.doesNotMatch(msg, /registry\.mjs recipe/);
+});
+
 test("recipeHint names the machine-readable registry", () => {
-  assert.match(recipeHint("gitleaks"), /tool-registry/);
-  assert.match(recipeHint("gitleaks"), /gitleaks/);
+  const hint = recipeHint(
+    "gitleaks",
+    join("w", "Dev", "school", "tool-registry", "registry.mjs"),
+  );
+  assert.match(hint, /tool-registry/);
+  assert.match(hint, /gitleaks/);
 });
 
 test("cli entry point answers --help with usage and exit 0", () => {
   const res = spawnSync(process.execPath, ["ci/bootstrap.mjs", "--help"], {
     encoding: "utf8",
-    cwd: path.resolve(import.meta.dirname, ".."),
+    cwd: repoRoot,
   });
   assert.equal(res.status, 0, res.stderr);
   assert.match(res.stdout, /usage: node ci\/bootstrap\.mjs/);
@@ -82,8 +103,32 @@ test("cli entry point answers --help with usage and exit 0", () => {
 test("cli rejects unknown arguments with exit 2", () => {
   const res = spawnSync(process.execPath, ["ci/bootstrap.mjs", "--nope"], {
     encoding: "utf8",
-    cwd: path.resolve(import.meta.dirname, ".."),
+    cwd: repoRoot,
   });
   assert.equal(res.status, 2, res.stderr);
   assert.match(res.stderr, /unknown argument: --nope/);
+});
+
+test("missing go exits 2 with an install hint before any step runs", () => {
+  const res = spawnSync(process.execPath, ["ci/bootstrap.mjs"], {
+    encoding: "utf8",
+    cwd: repoRoot,
+    env: { ...process.env, PATH: dirname(process.execPath) },
+  });
+  assert.equal(res.status, 2, res.stderr);
+  assert.match(res.stderr, /missing required tools: go/);
+  assert.match(res.stderr, /install/);
+});
+
+test("main switches to the repository root before parsing arguments", () => {
+  const before = process.cwd();
+  const outside = mkdtempSync(join(tmpdir(), "mg-bootstrap-"));
+  try {
+    process.chdir(outside);
+    assert.equal(main(["--nope"]), 2);
+    assert.equal(process.cwd(), repoRoot);
+  } finally {
+    process.chdir(before);
+    rmSync(outside, { recursive: true, force: true });
+  }
 });

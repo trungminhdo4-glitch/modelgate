@@ -33,12 +33,15 @@ $ node ci/bootstrap.mjs            # go mod download + tool preflight + full gat
 $ node ci/bootstrap.mjs --offline  # re-run without module download (air-gapped)
 ```
 
-The script executes a fixed step plan (`go mod download` unless `--offline`,
-tool preflight, `gofmt -l`, `go vet`, `go test ./... -count=1`, gate unit
-tests, keyword gate). A missing required tool (`go`, `node`, `gitleaks`,
-`actionlint`, `yamllint`) fails closed with exit 2 and a pointer to the
-machine tool registry (`school/tool-registry`); a failing step exits 1.
-Step semantics are pinned by `ci/test-bootstrap.mjs`.
+The script executes a fixed step plan (tool preflight first, then `go mod
+download` unless `--offline`, `gofmt -l`, `go vet`, `go test ./... -count=1`,
+gate unit tests, keyword gate). A missing required tool (`go`, `node`,
+`gitleaks`, `actionlint`, `yamllint`) fails closed with exit 2 and a pointer
+to the machine tool registry (`school/tool-registry`) - or, on machines
+without that registry, with a pointer to this section of RELEASING.md. A
+failing step exits 1. The script always runs against the repository root,
+regardless of the invoking directory. Step semantics are pinned by
+`ci/test-bootstrap.mjs`.
 
 ## Reproducible repository initialization
 

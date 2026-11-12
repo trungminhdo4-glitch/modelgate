@@ -9,7 +9,35 @@ signing and support policy.
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+* `ci/bootstrap.mjs` - reproducible fresh-clone bootstrap: tool preflight,
+  module download, format/vet/test, gate tests and keyword gate in one
+  pinned step plan; `--offline` skips the module download. Missing tools
+  fail closed with exit 2 in every mode, covered by `ci/test-bootstrap.mjs`.
+
+### Changed
+
+* Support window (README, RELEASING) is now explicitly **best effort** - an
+  intention of a non-commercial project, not a binding commitment or SLA.
+* Repository initialization and bootstrap are documented as a command set
+  in RELEASING.md; the DCO identity decision is documented in
+  CONTRIBUTING.md, and why `internal/testserver` sits outside the coverage
+  gate is documented in CONTRIBUTING.md and the README.
+* yamllint runs against a committed profile (`.yamllint.yml`) instead of
+  ad-hoc line wrapping.
+
+### Fixed
+
+* Gitleaks workflow: `go install` used `github.com/gitleaks/gitleaks/v8`,
+  which does not match the declared module path
+  (`github.com/zricethezav/gitleaks/v8`); the install also now publishes
+  `$(go env GOPATH)/bin` for the following step.
+* Scorecard workflow: `ossf/scorecard-action@v2` no longer exists as a tag;
+  pinned to the released `v2.5.0`.
+* Bootstrap executed `go mod download` before its own tool preflight, so a
+  missing `go` exited 1 with a raw `ENOENT` instead of the documented
+  exit 2.
 
 ## [0.1.0] - 2026-11-11
 

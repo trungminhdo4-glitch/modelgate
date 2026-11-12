@@ -2,16 +2,19 @@
 // bootstrap.mjs - reproducible fresh-clone bootstrap (node builtins only).
 //
 // Deterministic, ordered step plan:
-//   go-mod-download -> tool-preflight -> gofmt -> go-vet -> go-test ->
+//   tool-preflight -> go-mod-download -> gofmt -> go-vet -> go-test ->
 //   gate-tests -> keyword-gate
 //
-// Fail-closed: a missing required tool exits 2 with a pointer to the
-// machine tool registry; a failing step exits 1. No step is skipped
-// silently and no step contains placeholders.
+// Fail-closed: a missing required tool exits 2 in every mode (the preflight
+// runs first, so no step can fail with a raw ENOENT before the check); a
+// failing step exits 1. No step is skipped silently and no step contains
+// placeholders. All steps run against this repository's root, no matter
+// which directory the script was invoked from.
 //
 // Exit codes: 0 = bootstrap green, 1 = step failed, 2 = missing tool/usage.
 
 import { spawnSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -31,32 +34,57 @@ const PROBE_ARGS = {
 
 const REGISTRY = path.join("Dev", "school", "tool-registry", "registry.mjs");
 
-export function recipeHint(tool) {
-  const root = process.env.USERPROFILE || process.env.HOME || os.homedir();
-  return `node ${path.join(root, REGISTRY)} recipe ${tool}`;
+/** Repository root, derived from this file - independent of the caller's cwd. */
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+
+/**
+ * Absolute path of the machine tool registry if it exists on this machine,
+ * null otherwise (fresh clones of this public repo on foreign machines).
+ */
+export function discoverRegistry(
+  root = process.env.USERPROFILE || process.env.HOME || os.homedir(),
+) {
+  const candidate = path.join(root, REGISTRY);
+  return existsSync(candidate) ? candidate : null;
 }
 
-export function describeMissing(missing) {
-  return [
+export function recipeHint(tool, registryPath) {
+  return `node ${registryPath} recipe ${tool}`;
+}
+
+export function describeMissing(missing, { registryPath = discoverRegistry() } = {}) {
+  const header = [
     `missing required tools: ${missing.join(", ")}`,
-    "install them via the machine tool registry (school/tool-registry):",
-    ...missing.map((t) => `  ${recipeHint(t)}`),
+  ];
+  if (registryPath) {
+    return [
+      ...header,
+      "install them via the machine tool registry (school/tool-registry):",
+      ...missing.map((t) => `  ${recipeHint(t, registryPath)}`),
+    ].join("\n");
+  }
+  return [
+    ...header,
+    "install them with your platform package manager, then re-run; the exact",
+    "bootstrap steps are documented in RELEASING.md (section 'Repository bootstrap'):",
+    ...missing.map((t) => `  - ${t}`),
   ].join("\n");
 }
 
 /**
  * The bootstrap step plan. `offline` drops exactly the module download;
- * everything else always runs.
+ * everything else always runs. The tool preflight is always first so a
+ * missing tool fails with exit 2 before any step executes.
  */
 export function planSteps({ offline }) {
   const steps = [
-    { id: "go-mod-download", kind: "exec", cmd: "go", argv: ["mod", "download"] },
     {
       id: "tool-preflight",
       kind: "preflight",
       cmd: "preflight",
       argv: [...REQUIRED_TOOLS],
     },
+    { id: "go-mod-download", kind: "exec", cmd: "go", argv: ["mod", "download"] },
     { id: "gofmt", kind: "exec", cmd: "gofmt", argv: ["-l", "."], expectEmptyStdout: true },
     { id: "go-vet", kind: "exec", cmd: "go", argv: ["vet", "./..."] },
     { id: "go-test", kind: "exec", cmd: "go", argv: ["test", "./...", "-count=1"] },
@@ -103,7 +131,8 @@ function runStep(step) {
   return true;
 }
 
-function main(argv) {
+export function main(argv) {
+  process.chdir(REPO_ROOT);
   if (argv.includes("--help")) {
     process.stdout.write(
       "usage: node ci/bootstrap.mjs [--offline]\n" +
