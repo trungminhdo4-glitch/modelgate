@@ -27,6 +27,60 @@ const (
 
 var errBoom = errors.New("boom")
 
+type deadlineFetcher struct {
+	hf.Fetcher
+	metaDeadline time.Time
+	treeDeadline time.Time
+}
+
+func (f *deadlineFetcher) Meta(ctx context.Context, _, _, _ string) (*hf.Meta, error) {
+	f.metaDeadline, _ = ctx.Deadline()
+	return &hf.Meta{Sha: fixtureRev}, nil
+}
+
+func (f *deadlineFetcher) Tree(ctx context.Context, _, _, _ string) ([]hf.TreeEntry, error) {
+	f.treeDeadline, _ = ctx.Deadline()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case <-time.After(time.Second):
+		return nil, errBoom
+	}
+}
+
+func TestCheckTimeoutIsSharedAcrossRequests(t *testing.T) {
+	app, out, errBuf := newTestApp(t)
+	fetcher := &deadlineFetcher{}
+	app.NewFetcher = func(_ string, _ time.Duration) (hf.Fetcher, error) {
+		return fetcher, nil
+	}
+	code := run(t, app, "check", "fixture/benign", "--timeout", "10ms")
+	if code != ExitError || out.Len() != 0 || !strings.Contains(errBuf.String(), "deadline exceeded") {
+		t.Fatalf("exit=%d stdout=%q stderr=%q", code, out, errBuf)
+	}
+	if fetcher.metaDeadline.IsZero() || !fetcher.metaDeadline.Equal(fetcher.treeDeadline) {
+		t.Fatalf("metadata deadline %v, tree deadline %v", fetcher.metaDeadline, fetcher.treeDeadline)
+	}
+}
+
+func TestCheckRejectsNonPositiveTimeoutBeforeCreatingFetcher(t *testing.T) {
+	for _, timeout := range []string{"0", "-1s"} {
+		t.Run(timeout, func(t *testing.T) {
+			app, _, errBuf := newTestApp(t)
+			app.NewFetcher = func(_ string, _ time.Duration) (hf.Fetcher, error) {
+				t.Fatal("invalid timeout reached fetcher creation")
+				return nil, errBoom
+			}
+			if code := run(t, app, "check", "fixture/benign", "--timeout", timeout); code != ExitError {
+				t.Fatalf("exit=%d stderr=%q", code, errBuf)
+			}
+			if !strings.Contains(errBuf.String(), "--timeout") {
+				t.Fatalf("timeout error missing: %s", errBuf)
+			}
+		})
+	}
+}
+
 func newTestApp(t *testing.T) (*App, *bytes.Buffer, *bytes.Buffer) {
 	t.Helper()
 	out, errBuf := &bytes.Buffer{}, &bytes.Buffer{}

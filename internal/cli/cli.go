@@ -136,6 +136,10 @@ func (a *App) cmdCheck(ctx context.Context, args []string) int {
 		fmt.Fprintf(a.Err, "modelgate check: --type: %v\n", err)
 		return ExitError
 	}
+	if *timeout <= 0 {
+		fmt.Fprintln(a.Err, "modelgate check: --timeout must be a positive duration")
+		return ExitError
+	}
 
 	fetcher, err := a.NewFetcher(*apiURL, *timeout)
 	if err != nil {
@@ -143,6 +147,8 @@ func (a *App) cmdCheck(ctx context.Context, args []string) int {
 		return ExitError
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, *timeout)
+	defer cancel()
 	res, err := scan.Analyze(ctx, fetcher, scan.Options{
 		RepoType: *repoType,
 		RepoID:   repoID,
@@ -150,6 +156,10 @@ func (a *App) cmdCheck(ctx context.Context, args []string) int {
 		Pin:      *pin,
 	})
 	if err != nil {
+		fmt.Fprintf(a.Err, "modelgate check: %v\n", err)
+		return ExitError
+	}
+	if err := ctx.Err(); err != nil {
 		fmt.Fprintf(a.Err, "modelgate check: %v\n", err)
 		return ExitError
 	}
