@@ -3,6 +3,7 @@ package hf
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -95,6 +96,69 @@ func TestNewClientDefaults(t *testing.T) {
 }
 
 const testRev = "rev01abcdef01abcdef01abcdef01abcdef01"
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestTreePagination(t *testing.T) {
+	const path = "/api/models/fixture/model/tree/main"
+	for _, tc := range []struct {
+		name string
+		link string
+		want string
+	}{
+		{"relative", `<?recursive=true&cursor=two>; rel="next"`, ""},
+		{"absolute", `<https://fixture.invalid` + path + `?cursor=two>; rel=next`, ""},
+		{"external", `<https://other.invalid` + path + `?cursor=two>; rel="next"`, "outside"},
+		{"other path", `</api/models/other/model/tree/main?cursor=two>; rel="next"`, "outside"},
+		{"loop", `<?recursive=true>; rel="next"`, "cycle"},
+		{"redirect", `<?recursive=true&cursor=redirect>; rel="next"`, "outside"},
+		{"missing page", `<?cursor=missing>; rel=next`, "page 2 was not found"},
+		{"ambiguous", `<?cursor=two>; rel=next, <?cursor=other>; rel=next`, "ambiguous"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c, err := NewClient("https://fixture.invalid", time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			calls := 0
+			c.hc.Transport = roundTripFunc(func(req *http.Request) (*http.Response, error) {
+				calls++
+				if req.Method != http.MethodGet || req.URL.Host != "fixture.invalid" || req.URL.Path != path {
+					t.Fatalf("unexpected request: %v", req)
+				}
+				res := &http.Response{StatusCode: 200, Header: make(http.Header), Request: req}
+				body := `[{"type":"file","path":"config.json"}]`
+				switch req.URL.Query().Get("cursor") {
+				case "":
+					res.Header.Set("Link", `<?recursive=true>; rel="first", `+tc.link)
+				case "two":
+					body = `[{"type":"file","path":"later.py"}]`
+				case "redirect":
+					res.StatusCode = http.StatusFound
+					res.Header.Set("Location", "https://other.invalid"+path)
+				case "missing":
+					res.StatusCode = http.StatusNotFound
+				default:
+					t.Fatalf("unexpected cursor: %s", req.URL.RawQuery)
+				}
+				res.Body = io.NopCloser(strings.NewReader(body))
+				return res, nil
+			})
+			entries, err := c.Tree(context.Background(), RepoModel, "fixture/model", "main")
+			if tc.want != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.want) || entries != nil || IsNotFound(err) {
+					t.Fatalf("tree=%v, err=%v, want %q and no partial tree", entries, err, tc.want)
+				}
+				return
+			}
+			if err != nil || calls != 2 || len(entries) != 2 || entries[1].Path != "later.py" {
+				t.Fatalf("tree=%v, calls=%d, err=%v", entries, calls, err)
+			}
+		})
+	}
+}
 
 func startFixture(t *testing.T, repoType, id string) *testserver.Server {
 	t.Helper()

@@ -45,7 +45,7 @@ Scope of the analysis (v0.1):
 | Surface | What is checked |
 | --- | --- |
 | `config.json` | `trust_remote_code`, `auto_map` entry points, malformed values |
-| Repository tree | traversal/absolute paths, size and file-count limits, unexpected entry types |
+| Repository tree | bounded pagination, traversal/absolute paths, size and file-count limits, unexpected entry types |
 | Python sources | 13 static rules across command execution, dynamic evaluation, obfuscation, networking, unsafe deserialization, dependency confusion |
 | Model card | documented `trust_remote_code` usage |
 | Dataset repos | presence of executable loading scripts |

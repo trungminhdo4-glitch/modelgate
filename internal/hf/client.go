@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -40,14 +41,17 @@ var (
 
 // Response size caps (bytes). They bound memory use on hostile input.
 const (
-	maxMetaBody = 16 << 20 // 16 MiB for API metadata
-	maxRawBody  = 2 << 20  // 2 MiB for raw files (analysis cap is lower)
+	maxMetaBody  = 16 << 20 // 16 MiB for API metadata
+	maxRawBody   = 2 << 20  // 2 MiB for raw files (analysis cap is lower)
+	maxTreePages = 64
 )
 
 var (
 	repoID         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*(/[A-Za-z0-9][A-Za-z0-9._-]*)*$`)
 	revSeg         = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]*$`)
 	defaultBaseURL = "https://huggingface.co"
+	linkEntry      = regexp.MustCompile(`<([^>]*)>([^<]*)`)
+	linkRelation   = regexp.MustCompile(`(?i);\s*rel\s*=\s*(?:"([^"]*)"|([^;,\s]+))`)
 )
 
 // ValidateRepoID rejects anything that is not a plain "owner/name" style id.
@@ -187,34 +191,34 @@ func IsNotFound(err error) bool {
 	return errors.As(err, &he) && he.StatusCode == http.StatusNotFound
 }
 
-// get performs a bounded GET request and returns the body bytes.
-func (c *Client) get(ctx context.Context, u string, limit int64) ([]byte, error) {
+// get performs a bounded GET request and returns the body and response headers.
+func (c *Client) get(ctx context.Context, u string, limit int64) ([]byte, *http.Response, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	req.Header.Set("User-Agent", c.userAgent)
 	req.Header.Set("Accept", "*/*")
 	resp, err := c.hc.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("hf: GET %s: %w", u, err)
+		return nil, nil, fmt.Errorf("hf: GET %s: %w", u, err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("%w: GET %s", ErrNotFound, u)
+		return nil, nil, fmt.Errorf("%w: GET %s", ErrNotFound, u)
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, &HTTPError{StatusCode: resp.StatusCode, URL: u}
+		return nil, nil, &HTTPError{StatusCode: resp.StatusCode, URL: u}
 	}
 	limited := io.LimitReader(resp.Body, limit+1)
 	body, err := io.ReadAll(limited)
 	if err != nil {
-		return nil, fmt.Errorf("hf: reading %s: %w", u, err)
+		return nil, nil, fmt.Errorf("hf: reading %s: %w", u, err)
 	}
 	if int64(len(body)) > limit {
-		return nil, fmt.Errorf("%w: %s", ErrTooLarge, u)
+		return nil, nil, fmt.Errorf("%w: %s", ErrTooLarge, u)
 	}
-	return body, nil
+	return body, resp, nil
 }
 
 // apiPrefix maps the repository type to the API path segment.
@@ -296,7 +300,7 @@ func (c *Client) Meta(ctx context.Context, repoType, id, rev string) (*Meta, err
 		}
 		u += "/revision/" + escapeRev(rev)
 	}
-	body, err := c.get(ctx, u, maxMetaBody)
+	body, _, err := c.get(ctx, u, maxMetaBody)
 	if err != nil {
 		return nil, err
 	}
@@ -327,12 +331,86 @@ func (c *Client) Tree(ctx context.Context, repoType, id, rev string) ([]TreeEntr
 	if err != nil {
 		return nil, err
 	}
-	u := c.base.String() + prefix + "/" + escapeID(id) + "/tree/" + escapeRev(rev) + "?recursive=true"
-	body, err := c.get(ctx, u, maxMetaBody)
+	root, err := url.Parse(c.base.String() + prefix + "/" + escapeID(id) + "/tree/" + escapeRev(rev) + "?recursive=true")
 	if err != nil {
 		return nil, err
 	}
-	return ParseTree(body)
+	// A pagination link or redirect may change the query, but it must stay on
+	// the same repository tree endpoint and origin.
+	validate := func(next *url.URL) error {
+		if next.Scheme != root.Scheme || !strings.EqualFold(next.Host, root.Host) ||
+			next.EscapedPath() != root.EscapedPath() || next.User != nil || next.Fragment != "" {
+			return errors.New("hf: tree pagination points outside the repository tree endpoint")
+		}
+		return nil
+	}
+	hc := *c.hc
+	hc.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 10 {
+			return errors.New("hf: too many tree redirects")
+		}
+		return validate(req.URL)
+	}
+	paged := *c
+	paged.hc = &hc
+
+	var tree []TreeEntry
+	seen := make(map[string]bool)
+	remaining := int64(maxMetaBody)
+	for next := root; next != nil; {
+		if len(seen) >= maxTreePages {
+			return nil, fmt.Errorf("%w: tree exceeds %d pages", ErrTooLarge, maxTreePages)
+		}
+		key := next.String()
+		if seen[key] {
+			return nil, errors.New("hf: tree pagination cycle")
+		}
+		seen[key] = true
+		body, resp, err := paged.get(ctx, key, remaining)
+		if err != nil {
+			if len(seen) > 1 && IsNotFound(err) {
+				return nil, fmt.Errorf("hf: tree page %d was not found", len(seen))
+			}
+			return nil, err
+		}
+		remaining -= int64(len(body))
+		entries, err := ParseTree(body)
+		if err != nil {
+			return nil, err
+		}
+		tree = append(tree, entries...)
+		next, err = nextTreePage(resp.Request.URL, resp.Header.Values("Link"))
+		if err != nil {
+			return nil, err
+		}
+		if next != nil {
+			if err := validate(next); err != nil {
+				return nil, err
+			}
+		}
+	}
+	return tree, nil
+}
+
+func nextTreePage(current *url.URL, headers []string) (*url.URL, error) {
+	var next *url.URL
+	for _, header := range headers {
+		for _, entry := range linkEntry.FindAllStringSubmatch(header, -1) {
+			rel := linkRelation.FindStringSubmatch(entry[2])
+			if rel == nil || !slices.Contains(strings.Fields(rel[1]+rel[2]), "next") {
+				continue
+			}
+			if next != nil || entry[1] == "" {
+				return nil, errors.New("hf: ambiguous or empty next tree page")
+			}
+			var err error
+			next, err = current.Parse(entry[1])
+			if err != nil {
+				return nil, errors.New("hf: invalid next tree page URL")
+			}
+		}
+	}
+	return next, nil
 }
 
 // ParseTree decodes a repository tree JSON document. Every entry path is
@@ -371,5 +449,6 @@ func (c *Client) Raw(ctx context.Context, repoType, id, rev, path string) ([]byt
 		return nil, err
 	}
 	u := c.base.String() + root + "/" + escapeID(id) + "/raw/" + escapeRev(rev) + "/" + escapePath(path)
-	return c.get(ctx, u, maxRawBody)
+	body, _, err := c.get(ctx, u, maxRawBody)
+	return body, err
 }
