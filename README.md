@@ -178,7 +178,7 @@ Important flags for `check`:
 | `--pin` | — | expected commit SHA; emits a delta report when upstream differs |
 | `--format` | `text` | `text`, `json`, `sigma` or `sarif` |
 | `--fail-on` | `high` | minimum severity that fails the check |
-| `--out` / `--sbom` | — | **the only** filesystem writes; opt-in by flag |
+| `--out` / `--sbom` | — | **the only** filesystem writes; use distinct files when supplying both flags |
 | `--api-url` | `https://huggingface.co` | Hugging Face compatible API base URL (GET only) |
 | `--timeout` | `30s` | shared deadline for repository analysis, including pinned revision checks (positive duration such as `500ms` or `2m`) |
 
