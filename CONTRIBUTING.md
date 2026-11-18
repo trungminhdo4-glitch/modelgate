@@ -29,7 +29,9 @@ Signed-off-by: Your Name <your.email@example.com>
 
 The name and email must match your Git identity (`git config user.name` /
 `git config user.email`). Commits without a matching sign-off fail the blocking
-`dco` CI job - see `ci/check-dco.mjs`.
+`dco` CI job - see `ci/check-dco.mjs`. Commits authored by GitHub App bots
+(for example Dependabot, `<id>+<name>[bot]@users.noreply.github.com`) are exempt,
+because a bot cannot certify the DCO.
 
 **Decision (identity vs. DCO check):** the repository-local Git identity is
 `trung-dev <trung-dev@users.noreply.github.com>` and the DCO check stays
