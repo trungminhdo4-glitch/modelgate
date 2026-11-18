@@ -286,6 +286,48 @@ func TestCheckOutAndSbomWriteFilesOnlyOnRequest(t *testing.T) {
 	}
 }
 
+func TestCheckRejectsSharedReportAndSbomOutput(t *testing.T) {
+	srv := fixture(t, "benign", "model", "fixture/benign")
+	dir := t.TempDir()
+	path := filepath.Join(dir, "existing.json")
+	original := []byte("previous report")
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	alias := dir + string(filepath.Separator) + "." + string(filepath.Separator) + "existing.json"
+	app, out, errBuf := newTestApp(t)
+	code := run(t, app, "check", "fixture/benign", "--api-url", srv.URL(),
+		"--out", path, "--sbom", alias)
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(after, original) {
+		t.Errorf("existing output was overwritten")
+	}
+	if code != ExitError || out.Len() != 0 || !strings.Contains(errBuf.String(), "must use distinct files") {
+		t.Fatalf("exit=%d stdout=%q stderr=%q", code, out, errBuf)
+	}
+}
+
+func TestCheckRejectsSameNewOutputBeforeCreatingFetcher(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "new.json")
+	alias := dir + string(filepath.Separator) + "." + string(filepath.Separator) + "new.json"
+	app, _, errBuf := newTestApp(t)
+	app.NewFetcher = func(_ string, _ time.Duration) (hf.Fetcher, error) {
+		t.Fatal("shared output reached fetcher creation")
+		return nil, errBoom
+	}
+	code := run(t, app, "check", "fixture/benign", "--out", path, "--sbom", alias)
+	if code != ExitError || !strings.Contains(errBuf.String(), "must use distinct files") {
+		t.Fatalf("exit=%d stderr=%q", code, errBuf)
+	}
+	if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("shared output should not exist: %v", err)
+	}
+}
+
 func TestCheckFailOnMedium(t *testing.T) {
 	srv := fixture(t, "benign", "model", "fixture/benign")
 	app, _, _ := newTestApp(t)

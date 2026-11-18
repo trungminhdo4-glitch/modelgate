@@ -14,6 +14,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -140,6 +142,10 @@ func (a *App) cmdCheck(ctx context.Context, args []string) int {
 		fmt.Fprintln(a.Err, "modelgate check: --timeout must be a positive duration")
 		return ExitError
 	}
+	if *out != "" && *sbomOut != "" && sameOutputFile(*out, *sbomOut) {
+		fmt.Fprintln(a.Err, "modelgate check: --out and --sbom must use distinct files")
+		return ExitError
+	}
 
 	fetcher, err := a.NewFetcher(*apiURL, *timeout)
 	if err != nil {
@@ -218,6 +224,24 @@ func (a *App) cmdCheck(ctx context.Context, args []string) int {
 		fmt.Fprintln(a.Err, "WARNING: findings at or above fail-on — do not load this revision without review.")
 	}
 	return s.ExitCode
+}
+
+func sameOutputFile(reportPath, sbomPath string) bool {
+	if reportPath == sbomPath {
+		return true
+	}
+	reportInfo, reportErr := os.Stat(reportPath)
+	sbomInfo, sbomErr := os.Stat(sbomPath)
+	if reportErr == nil && sbomErr == nil {
+		return os.SameFile(reportInfo, sbomInfo)
+	}
+	if !errors.Is(reportErr, os.ErrNotExist) || !errors.Is(sbomErr, os.ErrNotExist) {
+		return false
+	}
+	reportAbs, reportErr := filepath.Abs(reportPath)
+	sbomAbs, sbomErr := filepath.Abs(sbomPath)
+	return reportErr == nil && sbomErr == nil &&
+		(reportAbs == sbomAbs || (runtime.GOOS == "windows" && strings.EqualFold(reportAbs, sbomAbs)))
 }
 
 func (a *App) cmdRules(args []string) int {
