@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // check-dco.mjs — Developer Certificate of Origin gate (node builtins only).
 //
-// Every commit message in the pushed range must carry a
+// Every non-merge commit message in the pushed range must carry a
 // "Signed-off-by: Name <email>" line whose email matches the author
 // (or the committer). Used as a blocking CI job; also usable locally.
 //
@@ -50,7 +50,9 @@ function main(argv) {
   let log;
   try {
     const range = base === "--root" ? "HEAD" : `${base}..HEAD`;
-    log = git(["log", "--format=%H%x00%ae%x00%s%x00%b%x1e", range]);
+    // --no-merges: a pull_request checkout sits on GitHub's synthetic merge
+    // commit, which never carries a sign-off; only authored commits count.
+    log = git(["log", "--no-merges", "--format=%H%x00%ae%x00%s%x00%b%x1e", range]);
   } catch (err) {
     process.stderr.write(`check-dco: git log failed: ${err.message}\n`);
     return 2;

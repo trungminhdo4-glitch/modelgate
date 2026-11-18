@@ -146,3 +146,63 @@ test("sbom CLI writes a parseable document", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// --- check-dco on a pull_request checkout ----------------------------------
+// actions/checkout puts HEAD on GitHub's synthetic merge commit, which carries
+// no Signed-off-by line. The gate must judge only the commits the PR adds.
+
+function dcoRepo() {
+  const dir = mkdtempSync(join(tmpdir(), "modelgate-dco-"));
+  const env = { ...process.env, GIT_CONFIG_GLOBAL: join(dir, "none"), GIT_CONFIG_NOSYSTEM: "1" };
+  const g = (...args) => execFileSync("git", ["-c", "user.name=Dev", "-c", "user.email=dev@example.com", ...args], { cwd: dir, env, encoding: "utf8" });
+  g("init", "-q", "-b", "main");
+  const signed = "Signed-off-by: Dev <dev@example.com>";
+  writeFileSync(join(dir, "a.txt"), "a\n");
+  g("add", "a.txt");
+  g("commit", "-q", "-m", "base", "-m", signed);
+  g("checkout", "-q", "-b", "feature");
+  writeFileSync(join(dir, "b.txt"), "b\n");
+  g("add", "b.txt");
+  g("commit", "-q", "-m", "feature", "-m", signed);
+  g("checkout", "-q", "main");
+  writeFileSync(join(dir, "c.txt"), "c\n");
+  g("add", "c.txt");
+  g("commit", "-q", "-m", "main moves on", "-m", signed);
+  g("branch", "-q", "base-ref");
+  g("merge", "-q", "--no-ff", "-m", "Merge feature into main", "feature");
+  return { dir, env, g };
+}
+
+function runDco(dir, env, base) {
+  try {
+    const out = execFileSync(process.execPath, [join(ciDir, "check-dco.mjs"), base], { cwd: dir, env, encoding: "utf8" });
+    return { status: 0, out };
+  } catch (err) {
+    return { status: err.status, out: String(err.stdout ?? "") };
+  }
+}
+
+test("check-dco ignores the unsigned merge commit of a pull_request checkout", () => {
+  const { dir, env } = dcoRepo();
+  try {
+    const res = runDco(dir, env, "base-ref");
+    assert.equal(res.status, 0, res.out);
+    assert.match(res.out, /1 commit\(s\) signed off/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("check-dco still rejects an unsigned commit next to a merge commit", () => {
+  const { dir, env, g } = dcoRepo();
+  try {
+    writeFileSync(join(dir, "d.txt"), "d\n");
+    g("add", "d.txt");
+    g("commit", "-q", "-m", "unsigned");
+    const res = runDco(dir, env, "base-ref");
+    assert.equal(res.status, 1, res.out);
+    assert.match(res.out, /missing Signed-off-by line/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
