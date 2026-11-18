@@ -30,7 +30,8 @@ signing and support policy.
 ### Fixed
 
 * `check` rejects shared `--out` and `--sbom` targets before scanning or writing either output.
-
+* **DCO gate on pull requests** — `ci/check-dco.mjs` skips merge commits, so
+  GitHub's unsigned synthetic merge commit no longer fails every PR.
 * Gitleaks workflow: `go install` used `github.com/gitleaks/gitleaks/v8`,
   which does not match the declared module path
   (`github.com/zricethezav/gitleaks/v8`); the install also now publishes
