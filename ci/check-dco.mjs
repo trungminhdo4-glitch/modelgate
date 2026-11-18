@@ -10,7 +10,15 @@
 import { execFileSync } from "node:child_process";
 import process from "node:process";
 
+// GitHub App bots (Dependabot, autofix apps) commit as
+// "<id>+<name>[bot]@users.noreply.github.com" and cannot add a sign-off;
+// the DCO certifies a human contribution, so bot commits are exempt.
+const GITHUB_BOT_EMAIL = /^\d+\+[a-z0-9-]+\[bot\]@users\.noreply\.github\.com$/i;
+
 export function checkCommit(subject, body, authorEmail) {
+  if (GITHUB_BOT_EMAIL.test(authorEmail.trim())) {
+    return { ok: true };
+  }
   const text = `${subject}\n${body}`;
   const lines = text.split(/\r?\n/);
   const signoffs = lines

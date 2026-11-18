@@ -9,6 +9,10 @@ signing and support policy.
 
 ## [Unreleased]
 
+### Fixed
+
+* DCO gate exempts GitHub App bot commits (`<id>+<name>[bot]@users.noreply.github.com`), so Dependabot PRs are no longer blocked by a sign-off they cannot add.
+
 ### Added
 
 * `ci/bootstrap.mjs` - reproducible fresh-clone bootstrap: tool preflight,

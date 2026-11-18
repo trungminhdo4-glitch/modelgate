@@ -109,6 +109,17 @@ test("dco rejects a mismatched sign-off", () => {
   assert.match(res.reason, /does not match/);
 });
 
+test("dco exempts GitHub App bot commits (Dependabot cannot sign off)", () => {
+  const res = checkCommit("build(deps): bump actions/checkout from 4 to 7", "", "49699333+dependabot[bot]@users.noreply.github.com");
+  assert.equal(res.ok, true);
+});
+
+test("dco still requires sign-off from a human noreply address", () => {
+  const res = checkCommit("feat: x", "", "12345+someone@users.noreply.github.com");
+  assert.equal(res.ok, false);
+  assert.match(res.reason, /missing Signed-off-by/);
+});
+
 test("sbom builds a valid CycloneDX 1.6 document", () => {
   const bom = buildBom(
     [
