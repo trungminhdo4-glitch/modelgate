@@ -186,6 +186,8 @@ Exit codes: **0** — no findings at or above `--fail-on`;
 **1** — findings at or above `--fail-on` (a `WARNING:` line is printed);
 **2** — usage or runtime error.
 
+`modelgate rules` exits with status 2 if writing its text or JSON output fails.
+
 CI integration examples:
 
 ```yaml

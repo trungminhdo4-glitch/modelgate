@@ -262,7 +262,10 @@ func (a *App) cmdRules(args []string) int {
 	switch *format {
 	case "text":
 		for _, r := range rules {
-			fmt.Fprintf(a.Out, "%-13s %-9s %s\n", r.ID, r.Severity, r.Title)
+			if _, err := fmt.Fprintf(a.Out, "%-13s %-9s %s\n", r.ID, r.Severity, r.Title); err != nil {
+				fmt.Fprintf(a.Err, "modelgate rules: writing output: %v\n", err)
+				return ExitError
+			}
 		}
 	case "json":
 		data, err := marshalRules(rules)
@@ -270,7 +273,10 @@ func (a *App) cmdRules(args []string) int {
 			fmt.Fprintf(a.Err, "modelgate rules: %v\n", err)
 			return ExitError
 		}
-		a.Out.Write(data)
+		if _, err := a.Out.Write(data); err != nil {
+			fmt.Fprintf(a.Err, "modelgate rules: writing output: %v\n", err)
+			return ExitError
+		}
 	default:
 		fmt.Fprintf(a.Err, "modelgate rules: --format must be text or json (got %q)\n", *format)
 		return ExitError
