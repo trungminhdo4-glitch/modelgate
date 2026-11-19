@@ -11,6 +11,8 @@ signing and support policy.
 
 ### Fixed
 
+* `modelgate rules` reports output write failures and exits with status 2 for text and JSON.
+
 * DCO gate exempts GitHub App bot commits (`<id>+<name>[bot]@users.noreply.github.com`), so Dependabot PRs are no longer blocked by a sign-off they cannot add.
 
 ### Added

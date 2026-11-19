@@ -418,6 +418,27 @@ func TestRulesCommand(t *testing.T) {
 	}
 }
 
+type failingRulesWriter struct{}
+
+func (failingRulesWriter) Write([]byte) (int, error) {
+	return 0, errBoom
+}
+
+func TestRulesWriteFailure(t *testing.T) {
+	for _, format := range []string{"text", "json"} {
+		t.Run(format, func(t *testing.T) {
+			app, _, stderr := newTestApp(t)
+			app.Out = failingRulesWriter{}
+			if code := run(t, app, "rules", "--format", format); code != ExitError {
+				t.Fatalf("exit = %d, want %d", code, ExitError)
+			}
+			if !strings.Contains(stderr.String(), errBoom.Error()) {
+				t.Fatalf("stderr = %q, want write failure", stderr.String())
+			}
+		})
+	}
+}
+
 // newSplitFlagSet mirrors the flag shape of the check subcommand.
 func newSplitFlagSet() *flag.FlagSet {
 	fs := flag.NewFlagSet("check", flag.ContinueOnError)
