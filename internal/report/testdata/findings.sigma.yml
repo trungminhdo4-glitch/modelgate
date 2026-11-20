@@ -27,7 +27,11 @@ detection:
     - 'subprocess.check_output('
   sel_mg_deser_001:
     - 'pickle.loads('
+    - 'pickle.load('
     - 'marshal.loads('
+    - 'marshal.load('
+    - 'joblib.load('
+    - 'dill.load('
     - 'shelve.open('
   sel_mg_deser_002:
     - 'torch.load('

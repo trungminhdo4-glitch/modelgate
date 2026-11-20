@@ -17,6 +17,7 @@ signing and support policy.
 
 ### Added
 
+* MG-DESER-001 also flags `marshal.load(`, `joblib.load(`, `dill.load(` and `pickle.load(` in the Sigma keyword list (joblib and dill are pickle-based).
 * `ci/bootstrap.mjs` - reproducible fresh-clone bootstrap: tool preflight,
   module download, format/vet/test, gate tests and keyword gate in one
   pinned step plan; `--offline` skips the module download. Missing tools

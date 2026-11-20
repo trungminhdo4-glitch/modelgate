@@ -177,12 +177,13 @@ var pyRules = []pyRule{
 		Severity: finding.SeverityHigh,
 		Structural: []*regexp.Regexp{
 			regexp.MustCompile(`\b(?:c?Pickle|pickle)\.loads?\s*\(`),
-			regexp.MustCompile(`\bmarshal\.loads\s*\(`),
+			regexp.MustCompile(`\bmarshal\.loads?\s*\(`),
+			regexp.MustCompile(`\b(?:joblib|dill)\.loads?\s*\(`),
 			regexp.MustCompile(`\bshelve\.open\s*\(`),
 		},
 		Remediation: "Pickle-family loaders can execute arbitrary code from the file. Load weights with safe formats or verify signatures first.",
 		References:  []string{"https://cwe.mitre.org/data/definitions/502.html"},
-		Keywords:    []string{"pickle.loads(", "marshal.loads(", "shelve.open("},
+		Keywords:    []string{"pickle.loads(", "pickle.load(", "marshal.loads(", "marshal.load(", "joblib.load(", "dill.load(", "shelve.open("},
 		Attack:      []string{"attack.t1562.001"},
 	},
 	{

@@ -54,6 +54,9 @@ func TestAnalyzePythonDetectsEachRule(t *testing.T) {
 		{"paste_endpoint", "url = 'https://pastebin.com/api/api_post.php'\n", "MG-NET-003"},
 		{"pickle_loads", "import pickle\nobj = pickle.loads(blob)\n", "MG-DESER-001"},
 		{"marshal_loads", "import marshal\nobj = marshal.loads(blob)\n", "MG-DESER-001"},
+		{"marshal_load_file", "import marshal\nobj = marshal.load(handle)\n", "MG-DESER-001"},
+		{"joblib_load", "import joblib\nobj = joblib.load('model.joblib')\n", "MG-DESER-001"},
+		{"dill_loads", "import dill\nobj = dill.loads(blob)\n", "MG-DESER-001"},
 		{"torch_load", "import torch\nstate = torch.load('w.bin')\n", "MG-DESER-002"},
 		{"ctypes_cdll", "import ctypes\nlib = ctypes.CDLL('x.dll')\n", "MG-LIB-001"},
 	}
