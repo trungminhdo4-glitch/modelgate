@@ -9,6 +9,19 @@ signing and support policy.
 
 ## [Unreleased]
 
+### Security
+
+* Python files pulled in by relative imports of an `auto_map` module
+  (`from .helpers import x`, recursively) are now analyzed as well.
+  `transformers` downloads and runs them with `trust_remote_code`, so a
+  payload one import away from the `auto_map` target was previously missed.
+  They count against the same analysis file limit (64 files).
+* SARIF artifact locations are valid relative URIs (percent-encoded, `\` to
+  `/`, `:` escaped) instead of raw file paths.
+* Repository file paths are validated per segment: dotted names such as
+  `weights..bin` no longer abort the scan, while `./x`, `a//b` and a leading
+  `\` are rejected.
+
 ### Fixed
 
 * `modelgate rules` rejects unexpected positional arguments instead of

@@ -275,6 +275,82 @@ func TestAnalyzePinMatch(t *testing.T) {
 	}
 }
 
+// transformers' trust_remote_code loader also downloads and imports every
+// relative import of an auto_map module, recursively. A payload hidden one or
+// two hops away must be analyzed like the auto_map target itself.
+func TestAnalyzeFollowsRelativeImports(t *testing.T) {
+	rev := "ccc012345678901234567890123456789012345"
+	srv := synth(t, testserver.Config{
+		ID:      "fixture/relimports",
+		Current: rev,
+		Revisions: map[string][]testserver.File{
+			rev: {
+				{Path: "config.json", Content: []byte(`{"auto_map": {"AutoModel": "modeling.Fixture"}}`)},
+				{Path: "modeling.py", Content: []byte("from .helpers import setup\r\nfrom ..outside import nope\nfrom .absent import gone\nclass Fixture: pass\n")},
+				{Path: "helpers.py", Content: []byte("import .deep\n\ndef setup():\n    return 1\n")},
+				{Path: "deep.py", Content: []byte("from .modeling import Fixture\nimport os\nos.system('id')\n")},
+				{Path: "unrelated.py", Content: []byte("import os\nos.system('never imported')\n")},
+			},
+		},
+	})
+	res, err := Analyze(context.Background(), fetcher(t, srv), Options{RepoID: "fixture/relimports"})
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	want := []string{"modeling.py", "helpers.py", "deep.py"}
+	if strings.Join(res.AnalyzedFiles, ",") != strings.Join(want, ",") {
+		t.Fatalf("analyzed files = %v, want %v", res.AnalyzedFiles, want)
+	}
+	var hit bool
+	for _, f := range res.Findings {
+		if f.Rule == "MG-CMD-001" && f.File == "deep.py" {
+			hit = true
+		}
+		if f.File == "unrelated.py" || f.Rule == RuleAutoMapMiss {
+			t.Fatalf("unexpected finding %+v", f)
+		}
+	}
+	if !hit {
+		t.Fatalf("payload two imports away was not reported: %+v", res.Findings)
+	}
+	if strings.Join(res.AutoMapTargets, ",") != "modeling.py" {
+		t.Fatalf("auto_map targets = %v", res.AutoMapTargets)
+	}
+}
+
+func TestAnalyzeRelativeImportsRespectFileLimit(t *testing.T) {
+	rev := "ddd012345678901234567890123456789012345"
+	srv := synth(t, testserver.Config{
+		ID:      "fixture/relimit",
+		Current: rev,
+		Revisions: map[string][]testserver.File{
+			rev: {
+				{Path: "config.json", Content: []byte(`{"auto_map": {"AutoModel": "a.Fixture"}}`)},
+				{Path: "a.py", Content: []byte("from .b import x\n")},
+				{Path: "b.py", Content: []byte("from .c import x\n")},
+				{Path: "c.py", Content: []byte("import os\nos.system('id')\n")},
+			},
+		},
+	})
+	res, err := Analyze(context.Background(), fetcher(t, srv), Options{RepoID: "fixture/relimit", MaxFiles: 2})
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if len(res.AnalyzedFiles) != 2 || !hasRule(res.Findings, RuleLimit) {
+		t.Fatalf("limit not enforced: files=%v findings=%+v", res.AnalyzedFiles, res.Findings)
+	}
+}
+
+func TestRelativeImports(t *testing.T) {
+	t.Parallel()
+	src := []byte("from .a import x\n  from .pkg.mod import y\nimport .b\n# from .commented import z\nfrom ..up import w\nfrom . import v\nx = 'from .str import u'\n")
+	got := strings.Join(relativeImports("sub/m.py", src), ",")
+	want := "sub/a.py,sub/b.py,sub/pkg.mod.py,sub/pkg/mod.py"
+	if got != want {
+		t.Fatalf("relativeImports = %q, want %q", got, want)
+	}
+}
+
 func TestAnalyzePinMismatchProducesDelta(t *testing.T) {
 	oldRev := "aaa012345678901234567890123456789012345"
 	newRev := "bbb012345678901234567890123456789012345"

@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pathpkg "path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -308,22 +310,17 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		}
 	}
 
-	// Cap and sort targets, then scan them.
+	// Scan the sorted targets first, then every relative import they pull in
+	// (breadth-first), all under one file cap.
 	targets = uniqueSorted(targets)
-	if len(targets) > a.opts.MaxFiles {
-		truncated := targets[:a.opts.MaxFiles]
-		findings = append(findings, finding.Finding{
-			Rule:        RuleLimit,
-			Severity:    finding.SeverityMedium,
-			Title:       "Analysis file limit reached",
-			Message:     fmt.Sprintf("Repository has %d candidate file(s); only the first %d (lexicographic) were analyzed.", len(targets), a.opts.MaxFiles),
-			Remediation: "Raise the limit deliberately or split the review; do not assume the rest is clean.",
-		})
-		targets = truncated
+	queue := append([]string(nil), targets...)
+	queued := make(map[string]bool, len(queue))
+	for _, p := range queue {
+		queued[p] = true
 	}
-
-	for _, path := range targets {
-		analyzed, ferr := a.scanTarget(ctx, path)
+	for i := 0; i < len(queue) && i < a.opts.MaxFiles; i++ {
+		path := queue[i]
+		analyzed, data, ferr := a.scanTarget(ctx, path)
 		if ferr != nil {
 			var se *skipError
 			if errors.As(ferr, &se) {
@@ -334,8 +331,57 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		}
 		files = append(files, path)
 		findings = append(findings, analyzed...)
+		for _, imp := range relativeImports(path, data) {
+			if _, present := a.fileIndex[imp]; present && !queued[imp] {
+				queued[imp] = true
+				queue = append(queue, imp)
+			}
+		}
+	}
+	if len(queue) > a.opts.MaxFiles {
+		findings = append(findings, finding.Finding{
+			Rule:        RuleLimit,
+			Severity:    finding.SeverityMedium,
+			Title:       "Analysis file limit reached",
+			Message:     fmt.Sprintf("Repository has at least %d candidate file(s) (targets and their relative imports); only the first %d were analyzed.", len(queue), a.opts.MaxFiles),
+			Remediation: "Raise the limit deliberately or split the review; do not assume the rest is clean.",
+		})
+		if len(targets) > a.opts.MaxFiles {
+			targets = targets[:a.opts.MaxFiles]
+		}
 	}
 	return files, findings, trust, targets, nil
+}
+
+// Relative imports as transformers' trust_remote_code loader detects them
+// (dynamic_module_utils.get_relative_imports): it downloads and imports each
+// one, recursively, so each is part of the code that runs.
+var (
+	relImportFrom  = regexp.MustCompile(`(?m)^[ \t]*from[ \t]+\.(\S+)[ \t]+import\b`)
+	relImportPlain = regexp.MustCompile(`(?m)^[ \t]*import[ \t]+\.(\S+)[ \t\r]*$`)
+)
+
+// relativeImports returns the repository paths a Python file pulls in through
+// relative imports, next to the file itself. A dotted name is tried both as
+// transformers resolves it ("pkg.mod.py") and as a subpackage ("pkg/mod.py").
+// Parent-package imports ("from ..x") are ignored: transformers does not
+// support them and they could point outside the repository.
+func relativeImports(file string, src []byte) []string {
+	dir := pathpkg.Dir(file)
+	var out []string
+	for _, re := range []*regexp.Regexp{relImportFrom, relImportPlain} {
+		for _, m := range re.FindAllSubmatch(src, -1) {
+			name := string(m[1])
+			if strings.HasPrefix(name, ".") {
+				continue
+			}
+			out = append(out,
+				pathpkg.Join(dir, name+".py"),
+				pathpkg.Join(dir, strings.ReplaceAll(name, ".", "/")+".py"),
+			)
+		}
+	}
+	return uniqueSorted(out)
 }
 
 // errSkipped is the sentinel every skipError matches. A skip carries its
@@ -429,10 +475,10 @@ func (a *analyzer) datasetScripts() ([]string, bool) {
 }
 
 // scanTarget fetches one Python target and runs the static analyzer on it.
-func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Finding, error) {
+func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Finding, []byte, error) {
 	entry, ok := a.fileIndex[path]
 	if !ok {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleAutoMapMiss,
 			Severity:    finding.SeverityMedium,
 			Title:       "auto_map target not present in repository",
@@ -442,7 +488,7 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 		}}
 	}
 	if entry.Size > a.opts.MaxFileBytes {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleLimit,
 			Severity:    finding.SeverityMedium,
 			Title:       "File exceeds analysis size limit",
@@ -454,10 +500,10 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 	data, err := a.fetch(ctx, path, a.opts.MaxFileBytes)
 	if err != nil {
 		if errors.Is(err, errSkipped) {
-			return nil, err
+			return nil, nil, err
 		}
 		if hf.IsNotFound(err) {
-			return nil, &skipError{f: finding.Finding{
+			return nil, nil, &skipError{f: finding.Finding{
 				Rule:        RuleAutoMapMiss,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map target not retrievable",
@@ -466,10 +512,10 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 				Remediation: "Inspect the repository before use.",
 			}}
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	if isLFSPointer(data) {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleLFS,
 			Severity:    finding.SeverityMedium,
 			Title:       "Target stored via Git LFS, content not analyzed",
@@ -478,7 +524,7 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 			Remediation: "Retrieve and review the object out-of-band if you need assurance.",
 		}}
 	}
-	return AnalyzePython(path, data), nil
+	return AnalyzePython(path, data), data, nil
 }
 
 // fetch downloads one file with limit enforcement. Oversized files surface as
