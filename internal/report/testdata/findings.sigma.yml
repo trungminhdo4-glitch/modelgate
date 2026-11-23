@@ -27,8 +27,18 @@ detection:
     - 'subprocess.check_output('
   sel_mg_deser_001:
     - 'pickle.loads('
+    - 'pickle.load('
     - 'marshal.loads('
+    - 'marshal.load('
+    - 'joblib.load('
+    - 'dill.load('
+    - 'dill.loads('
+    - 'cloudpickle.load('
+    - 'cloudpickle.loads('
+    - 'jsonpickle.decode('
+    - 'read_pickle('
     - 'shelve.open('
+    - 'yaml.unsafe_load('
   sel_mg_deser_002:
     - 'torch.load('
   sel_mg_enc_001:
