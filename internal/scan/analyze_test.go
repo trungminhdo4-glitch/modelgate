@@ -318,6 +318,53 @@ func TestAnalyzeFollowsRelativeImports(t *testing.T) {
 	}
 }
 
+// AutoTokenizer/AutoProcessor read auto_map from their own config files, as
+// [slow, fast] lists, and "repo--module.Class" pulls code from another repo.
+func TestAnalyzeAutoMapListsAuxConfigsAndRemoteRefs(t *testing.T) {
+	rev := "eee012345678901234567890123456789012345"
+	srv := synth(t, testserver.Config{
+		ID:      "fixture/automap",
+		Current: rev,
+		Revisions: map[string][]testserver.File{
+			rev: {
+				{Path: "config.json", Content: []byte(`{"auto_map": {"AutoModel": "other/shared--modeling.Model", "AutoConfig": "configuration.Cfg"}}`)},
+				{Path: "configuration.py", Content: []byte("class Cfg: pass\n")},
+				{Path: "tokenizer_config.json", Content: []byte(`{"auto_map": {"AutoTokenizer": ["tokenization.Slow", null]}}`)},
+				{Path: "tokenization.py", Content: []byte("import os\nos.system('id')\n")},
+				{Path: "preprocessor_config.json", Content: []byte(`{"auto_map": {"AutoImageProcessor": "processing.Proc"}}`)},
+				{Path: "processing.py", Content: []byte("x = eval('1')\n")},
+			},
+		},
+	})
+	res, err := Analyze(context.Background(), fetcher(t, srv), Options{RepoID: "fixture/automap"})
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	want := "configuration.py,processing.py,tokenization.py"
+	if got := strings.Join(res.AnalyzedFiles, ","); got != want {
+		t.Fatalf("analyzed files = %q, want %q", got, want)
+	}
+	var cmd, eval, remote bool
+	for _, f := range res.Findings {
+		switch {
+		case f.Rule == "MG-CMD-001" && f.File == "tokenization.py":
+			cmd = true
+		case f.Rule == "MG-EXEC-001" && f.File == "processing.py":
+			eval = true
+		case f.Rule == RuleAutoMapRemote:
+			remote = f.File == "config.json" && strings.Contains(f.Message, "other/shared")
+		case f.Rule == RuleAutoMapMiss || f.Rule == RuleAutoMapBadVal:
+			t.Fatalf("unexpected finding %+v", f)
+		}
+	}
+	if !cmd || !eval || !remote {
+		t.Fatalf("cmd=%v eval=%v remote=%v findings=%+v", cmd, eval, remote, res.Findings)
+	}
+	if res.Trust.AutoMapCount != 4 {
+		t.Fatalf("auto_map count = %d, want 4", res.Trust.AutoMapCount)
+	}
+}
+
 func TestAnalyzeRelativeImportsRespectFileLimit(t *testing.T) {
 	rev := "ddd012345678901234567890123456789012345"
 	srv := synth(t, testserver.Config{
