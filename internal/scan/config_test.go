@@ -77,6 +77,33 @@ func TestAutoMapEntriesExpandLists(t *testing.T) {
 	}
 }
 
+// pipeline(..., trust_remote_code=True) imports custom_pipelines[task]["impl"].
+func TestPipelineEntries(t *testing.T) {
+	t.Parallel()
+	cfg, err := ParseConfig([]byte(`{"custom_pipelines": {"b-task": {"impl": "pipe.P", "pt": ["AutoModel"]}, "a-task": {"pt": []}, "c": 3}}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	got := cfg.PipelineEntries()
+	want := []AutoMapEntry{
+		{Key: "custom_pipelines.a-task", Invalid: true},
+		{Key: "custom_pipelines.b-task", Target: "pipe.P"},
+		{Key: "custom_pipelines.c", Invalid: true},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("entries = %+v", got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("entry %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+	var none *ModelConfig
+	if none.PipelineEntries() != nil {
+		t.Fatal("nil config must have no pipeline entries")
+	}
+}
+
 func TestRemoteAutoMapRepo(t *testing.T) {
 	t.Parallel()
 	cases := map[string]string{

@@ -45,7 +45,7 @@ Scope of the analysis (v0.1):
 
 | Surface | What is checked |
 | --- | --- |
-| `config.json` | `trust_remote_code`, `auto_map` entry points, malformed values |
+| `config.json` | `trust_remote_code`, `auto_map` entry points, `custom_pipelines` implementations (`impl`), malformed values |
 | `tokenizer_config.json`, `preprocessor_config.json`, `processor_config.json` | `auto_map` entry points (including `[slow, fast]` tokenizer pairs), as `AutoTokenizer`/`AutoProcessor` load them |
 | Cross-repository `auto_map` (`org/repo--module.Class`) | reported as code that is loaded from another repository and not covered by the scan |
 | Repository tree | bounded pagination, traversal/absolute paths, size and file-count limits, unexpected entry types |

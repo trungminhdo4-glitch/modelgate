@@ -296,13 +296,13 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		})
 	}
 	for _, s := range sources {
-		if entries := s.cfg.AutoMapEntries(); len(entries) > 0 {
+		if entries := s.cfg.entryPoints(); len(entries) > 0 {
 			trust.AutoMapCount += len(entries)
 			findings = append(findings, finding.Finding{
 				Rule:        RuleAutoMap,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map exposes remote code extension points",
-				Message:     fmt.Sprintf("auto_map in %s defines %d entry point(s): %s", s.file, len(entries), summarizeEntries(entries)),
+				Message:     fmt.Sprintf("%s defines %d remote-code entry point(s) (auto_map, custom_pipelines): %s", s.file, len(entries), summarizeEntries(entries)),
 				File:        s.file,
 				Remediation: "Review the referenced files (ModelGate does this statically) before loading with trust_remote_code.",
 				References:  []string{"https://huggingface.co/docs/hub/trust-remote-code"},
@@ -462,13 +462,13 @@ func (a *analyzer) autoMapTargets(cfg *ModelConfig, file string, findings []find
 		return nil, findings
 	}
 	var targets []string
-	for _, e := range cfg.AutoMapEntries() {
+	for _, e := range cfg.entryPoints() {
 		if e.Invalid {
 			findings = append(findings, finding.Finding{
 				Rule:        RuleAutoMapBadVal,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map value has unexpected type",
-				Message:     fmt.Sprintf("auto_map[%q] is not a string or a list of strings; the referenced code path could not be resolved.", e.Key),
+				Message:     fmt.Sprintf("%s is not a string or a list of strings; the referenced code path could not be resolved.", entryLabel(e)),
 				File:        file,
 				Remediation: "Fix the config or inspect the repository manually.",
 			})
@@ -479,7 +479,7 @@ func (a *analyzer) autoMapTargets(cfg *ModelConfig, file string, findings []find
 				Rule:        RuleAutoMapRemote,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map loads code from another repository",
-				Message:     fmt.Sprintf("auto_map[%q]=%q makes transformers download and import code from %q; that code is not part of this scan.", e.Key, e.Target, repo),
+				Message:     fmt.Sprintf("%s=%q makes transformers download and import code from %q; that code is not part of this scan.", entryLabel(e), e.Target, repo),
 				File:        file,
 				Evidence:    e.Target,
 				Remediation: "Scan the referenced repository as well and pin both repositories to reviewed revisions.",
@@ -493,7 +493,7 @@ func (a *analyzer) autoMapTargets(cfg *ModelConfig, file string, findings []find
 				Rule:        RuleAutoMapUnsafe,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map target rejected",
-				Message:     fmt.Sprintf("auto_map[%q]=%q: %v", e.Key, e.Target, err),
+				Message:     fmt.Sprintf("%s=%q: %v", entryLabel(e), e.Target, err),
 				File:        file,
 				Evidence:    e.Target,
 				Remediation: "An auto_map target must resolve to a plain repository file path. Inspect the config manually.",
