@@ -273,9 +273,17 @@ func escapePath(p string) string {
 }
 
 // validateFilePath rejects traversal and absolute paths in file references.
+// The check is per segment, under both '/' and '\': an empty, "." or ".."
+// segment is refused, while names that merely contain dots ("weights..bin")
+// are ordinary Hub files and must not abort the scan.
 func validateFilePath(p string) error {
-	if p == "" || strings.HasPrefix(p, "/") || strings.Contains(p, "..") || strings.ContainsRune(p, 0) {
+	if p == "" || strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) || strings.ContainsRune(p, 0) {
 		return fmt.Errorf("invalid file path: %q", p)
+	}
+	for _, seg := range strings.Split(strings.ReplaceAll(p, `\`, "/"), "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return fmt.Errorf("invalid file path: %q", p)
+		}
 	}
 	return nil
 }
