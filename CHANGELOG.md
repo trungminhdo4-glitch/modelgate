@@ -11,12 +11,16 @@ signing and support policy.
 
 ### Fixed
 
+* `modelgate rules` rejects unexpected positional arguments instead of
+  silently printing the entire catalogue.
 * `modelgate rules` reports output write failures and exits with status 2 for text and JSON.
 
 * DCO gate exempts GitHub App bot commits (`<id>+<name>[bot]@users.noreply.github.com`), so Dependabot PRs are no longer blocked by a sign-off they cannot add.
 
 ### Added
 
+* Offline rule catalogue filters: `rules --id ID` and `--min-severity LEVEL`
+  combine for text or JSON output, preserving rule details and catalogue order.
 * `ci/bootstrap.mjs` - reproducible fresh-clone bootstrap: tool preflight,
   module download, format/vet/test, gate tests and keyword gate in one
   pinned step plan; `--offline` skips the module download. Missing tools
