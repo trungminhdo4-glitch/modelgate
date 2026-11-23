@@ -359,6 +359,43 @@ func FuzzParseMeta(f *testing.F) {
 	})
 }
 
+// pathEscapes is an independent oracle for validateFilePath: a path is unsafe
+// when it is empty, absolute, contains NUL, or has an empty, "." or ".."
+// segment under either separator.
+func pathEscapes(p string) bool {
+	if p == "" || strings.HasPrefix(p, "/") || strings.HasPrefix(p, `\`) || strings.ContainsRune(p, 0) {
+		return true
+	}
+	for _, seg := range strings.Split(strings.ReplaceAll(p, `\`, "/"), "/") {
+		if seg == "" || seg == "." || seg == ".." {
+			return true
+		}
+	}
+	return false
+}
+
+func TestValidateFilePathIsSegmentBased(t *testing.T) {
+	t.Parallel()
+	// Names that merely contain dots are legitimate Hub files; rejecting them
+	// made ParseTree discard the whole tree and abort the scan.
+	valid := []string{"a.py", "weights..bin", "notes...txt", "v1..2/config.json", "sub/model.safetensors", ".gitattributes", "dir/.hidden"}
+	invalid := []string{"", "..", "../x", "a/../b", "a/..", "./x", "a/./b", "a//b", "a/", "/abs", `\abs`, `a\..\b`, `..\x`, "a\x00b"}
+	for _, p := range valid {
+		if err := validateFilePath(p); err != nil {
+			t.Errorf("validateFilePath(%q) rejected a safe path: %v", p, err)
+		}
+	}
+	for _, p := range invalid {
+		if err := validateFilePath(p); err == nil {
+			t.Errorf("validateFilePath(%q) accepted an unsafe path", p)
+		}
+	}
+	tree, err := ParseTree([]byte(`[{"type":"file","path":"weights..bin","oid":"o","size":1}]`))
+	if err != nil || len(tree) != 1 {
+		t.Fatalf("ParseTree with a dotted name = %v, %v", tree, err)
+	}
+}
+
 func FuzzParseTree(f *testing.F) {
 	f.Add([]byte(`[{"type":"file","path":"a.py","oid":"abc","size":1}]`))
 	f.Add([]byte(`[]`))
@@ -372,8 +409,8 @@ func FuzzParseTree(f *testing.F) {
 			// Type is untrusted data and may be any string: the scanner
 			// treats every entry that is not explicitly a directory as a
 			// file, so an odd type must never hide content.
-			if err := validateFilePath(e.Path); err != nil {
-				t.Fatalf("unsafe tree path %q accepted: %v", e.Path, err)
+			if pathEscapes(e.Path) {
+				t.Fatalf("unsafe tree path %q accepted", e.Path)
 			}
 		}
 	})

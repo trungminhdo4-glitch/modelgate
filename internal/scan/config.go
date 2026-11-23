@@ -58,15 +58,38 @@ func (c *ModelConfig) AutoMapEntries() []AutoMapEntry {
 	sortStrings(keys)
 	out := make([]AutoMapEntry, 0, len(keys))
 	for _, k := range keys {
-		raw := c.AutoMap[k]
-		str, ok := raw.(string)
-		if !ok {
+		switch v := c.AutoMap[k].(type) {
+		case string:
+			out = append(out, AutoMapEntry{Key: k, Target: v})
+		case []any:
+			// transformers stores tokenizer classes as a [slow, fast] pair;
+			// a null side means "no such class". Every named class is a
+			// module that gets imported, so each becomes its own entry.
+			for _, el := range v {
+				switch s := el.(type) {
+				case nil:
+				case string:
+					out = append(out, AutoMapEntry{Key: k, Target: s})
+				default:
+					out = append(out, AutoMapEntry{Key: k, Invalid: true})
+				}
+			}
+		default:
 			out = append(out, AutoMapEntry{Key: k, Invalid: true})
-			continue
 		}
-		out = append(out, AutoMapEntry{Key: k, Target: str})
 	}
 	return out
+}
+
+// RemoteAutoMapRepo reports the repository of a cross-repository auto_map
+// reference. transformers splits "org/repo--module.Class" at "--" and loads
+// module.py from org/repo, so that code is not part of the scanned repository.
+func RemoteAutoMapRepo(target string) (string, bool) {
+	repo, _, found := strings.Cut(strings.TrimSpace(target), "--")
+	if !found || repo == "" {
+		return "", false
+	}
+	return repo, true
 }
 
 // sortStrings is a tiny insertion-free wrapper so the package keeps a single

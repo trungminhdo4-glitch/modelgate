@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	pathpkg "path"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -20,6 +22,11 @@ const (
 	maxReadmeBytes      = 1 << 20
 )
 
+// auxAutoMapConfigs are the other files whose auto_map transformers honours
+// with trust_remote_code (AutoTokenizer, AutoImageProcessor/AutoFeatureExtractor,
+// AutoProcessor). config.json stays the only source of the trust flag.
+var auxAutoMapConfigs = []string{"tokenizer_config.json", "preprocessor_config.json", "processor_config.json"}
+
 // Rule identifiers produced by the orchestration layer (everything that is
 // not a Python pattern rule lives here).
 const (
@@ -28,6 +35,7 @@ const (
 	RuleCardMentions  = "MG-TRUST-003"
 	RuleAutoMapBadVal = "MG-CFG-002"
 	RuleAutoMapUnsafe = "MG-AUTO-001"
+	RuleAutoMapRemote = "MG-AUTO-002"
 	RuleAutoMapMiss   = "MG-MISS-001"
 	RuleConfigInvalid = "MG-CFG-001"
 	RuleLimit         = "MG-LIMIT-001"
@@ -229,11 +237,29 @@ func newAnalyzer(f hf.Fetcher, opts Options, rev string, tree []hf.TreeEntry) *a
 
 // run analyzes one revision: config, auto_map targets, dataset scripts, card.
 func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.Finding, trust TrustAssessment, targets []string, err error) {
-	cfg, cfgFindings, err := a.loadConfig(ctx)
+	cfg, cfgFindings, err := a.loadConfig(ctx, "config.json")
 	if err != nil {
 		return nil, nil, trust, nil, err
 	}
 	findings = append(findings, cfgFindings...)
+
+	// auto_map sources: config.json, plus the tokenizer and processor
+	// configs of a model repository.
+	type mapSource struct {
+		file string
+		cfg  *ModelConfig
+	}
+	sources := []mapSource{{"config.json", cfg}}
+	if a.opts.RepoType != hf.RepoDataset {
+		for _, name := range auxAutoMapConfigs {
+			aux, auxFindings, err := a.loadConfig(ctx, name)
+			if err != nil {
+				return nil, nil, trust, nil, err
+			}
+			findings = append(findings, auxFindings...)
+			sources = append(sources, mapSource{name, aux})
+		}
+	}
 
 	if a.opts.RepoType == hf.RepoDataset {
 		targets, trust.DatasetScripts = a.datasetScripts()
@@ -249,31 +275,35 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 			})
 		}
 	} else {
-		targets, findings = a.autoMapTargets(cfg, findings)
+		for _, s := range sources {
+			var found []string
+			found, findings = a.autoMapTargets(s.cfg, s.file, findings)
+			targets = append(targets, found...)
+		}
 	}
 
 	// Trust surface summary from config and card.
-	if cfg != nil {
-		if cfg.TrustRemoteCode != nil && *cfg.TrustRemoteCode {
-			trust.ConfigFlag = true
-			findings = append(findings, finding.Finding{
-				Rule:        RuleConfigFlag,
-				Severity:    finding.SeverityMedium,
-				Title:       "config.json sets trust_remote_code",
-				Message:     "The repository configuration enables trust_remote_code, which opts into importing repository Python code.",
-				File:        "config.json",
-				Remediation: "Only proceed after reviewing every referenced Python file, or pin and vendor them.",
-				References:  []string{"https://huggingface.co/docs/hub/trust-remote-code"},
-			})
-		}
-		if entries := cfg.AutoMapEntries(); len(entries) > 0 {
-			trust.AutoMapCount = len(entries)
+	if cfg != nil && cfg.TrustRemoteCode != nil && *cfg.TrustRemoteCode {
+		trust.ConfigFlag = true
+		findings = append(findings, finding.Finding{
+			Rule:        RuleConfigFlag,
+			Severity:    finding.SeverityMedium,
+			Title:       "config.json sets trust_remote_code",
+			Message:     "The repository configuration enables trust_remote_code, which opts into importing repository Python code.",
+			File:        "config.json",
+			Remediation: "Only proceed after reviewing every referenced Python file, or pin and vendor them.",
+			References:  []string{"https://huggingface.co/docs/hub/trust-remote-code"},
+		})
+	}
+	for _, s := range sources {
+		if entries := s.cfg.AutoMapEntries(); len(entries) > 0 {
+			trust.AutoMapCount += len(entries)
 			findings = append(findings, finding.Finding{
 				Rule:        RuleAutoMap,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map exposes remote code extension points",
-				Message:     fmt.Sprintf("auto_map defines %d entry point(s): %s", len(entries), summarizeEntries(entries)),
-				File:        "config.json",
+				Message:     fmt.Sprintf("auto_map in %s defines %d entry point(s): %s", s.file, len(entries), summarizeEntries(entries)),
+				File:        s.file,
 				Remediation: "Review the referenced files (ModelGate does this statically) before loading with trust_remote_code.",
 				References:  []string{"https://huggingface.co/docs/hub/trust-remote-code"},
 			})
@@ -308,22 +338,17 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		}
 	}
 
-	// Cap and sort targets, then scan them.
+	// Scan the sorted targets first, then every relative import they pull in
+	// (breadth-first), all under one file cap.
 	targets = uniqueSorted(targets)
-	if len(targets) > a.opts.MaxFiles {
-		truncated := targets[:a.opts.MaxFiles]
-		findings = append(findings, finding.Finding{
-			Rule:        RuleLimit,
-			Severity:    finding.SeverityMedium,
-			Title:       "Analysis file limit reached",
-			Message:     fmt.Sprintf("Repository has %d candidate file(s); only the first %d (lexicographic) were analyzed.", len(targets), a.opts.MaxFiles),
-			Remediation: "Raise the limit deliberately or split the review; do not assume the rest is clean.",
-		})
-		targets = truncated
+	queue := append([]string(nil), targets...)
+	queued := make(map[string]bool, len(queue))
+	for _, p := range queue {
+		queued[p] = true
 	}
-
-	for _, path := range targets {
-		analyzed, ferr := a.scanTarget(ctx, path)
+	for i := 0; i < len(queue) && i < a.opts.MaxFiles; i++ {
+		path := queue[i]
+		analyzed, data, ferr := a.scanTarget(ctx, path)
 		if ferr != nil {
 			var se *skipError
 			if errors.As(ferr, &se) {
@@ -334,8 +359,57 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		}
 		files = append(files, path)
 		findings = append(findings, analyzed...)
+		for _, imp := range relativeImports(path, data) {
+			if _, present := a.fileIndex[imp]; present && !queued[imp] {
+				queued[imp] = true
+				queue = append(queue, imp)
+			}
+		}
+	}
+	if len(queue) > a.opts.MaxFiles {
+		findings = append(findings, finding.Finding{
+			Rule:        RuleLimit,
+			Severity:    finding.SeverityMedium,
+			Title:       "Analysis file limit reached",
+			Message:     fmt.Sprintf("Repository has at least %d candidate file(s) (targets and their relative imports); only the first %d were analyzed.", len(queue), a.opts.MaxFiles),
+			Remediation: "Raise the limit deliberately or split the review; do not assume the rest is clean.",
+		})
+		if len(targets) > a.opts.MaxFiles {
+			targets = targets[:a.opts.MaxFiles]
+		}
 	}
 	return files, findings, trust, targets, nil
+}
+
+// Relative imports as transformers' trust_remote_code loader detects them
+// (dynamic_module_utils.get_relative_imports): it downloads and imports each
+// one, recursively, so each is part of the code that runs.
+var (
+	relImportFrom  = regexp.MustCompile(`(?m)^[ \t]*from[ \t]+\.(\S+)[ \t]+import\b`)
+	relImportPlain = regexp.MustCompile(`(?m)^[ \t]*import[ \t]+\.(\S+)[ \t\r]*$`)
+)
+
+// relativeImports returns the repository paths a Python file pulls in through
+// relative imports, next to the file itself. A dotted name is tried both as
+// transformers resolves it ("pkg.mod.py") and as a subpackage ("pkg/mod.py").
+// Parent-package imports ("from ..x") are ignored: transformers does not
+// support them and they could point outside the repository.
+func relativeImports(file string, src []byte) []string {
+	dir := pathpkg.Dir(file)
+	var out []string
+	for _, re := range []*regexp.Regexp{relImportFrom, relImportPlain} {
+		for _, m := range re.FindAllSubmatch(src, -1) {
+			name := string(m[1])
+			if strings.HasPrefix(name, ".") {
+				continue
+			}
+			out = append(out,
+				pathpkg.Join(dir, name+".py"),
+				pathpkg.Join(dir, strings.ReplaceAll(name, ".", "/")+".py"),
+			)
+		}
+	}
+	return uniqueSorted(out)
 }
 
 // errSkipped is the sentinel every skipError matches. A skip carries its
@@ -350,12 +424,13 @@ func (e *skipError) Is(target error) bool {
 	return target == errSkipped
 }
 
-// loadConfig fetches and parses config.json if present.
-func (a *analyzer) loadConfig(ctx context.Context) (*ModelConfig, []finding.Finding, error) {
-	if _, ok := a.firstOf("config.json"); !ok {
+// loadConfig fetches and parses one JSON config file (config.json or a
+// tokenizer/processor config) if present.
+func (a *analyzer) loadConfig(ctx context.Context, name string) (*ModelConfig, []finding.Finding, error) {
+	if _, ok := a.firstOf(name); !ok {
 		return nil, nil, nil
 	}
-	data, err := a.fetch(ctx, "config.json", a.opts.MaxFileBytes)
+	data, err := a.fetch(ctx, name, a.opts.MaxFileBytes)
 	if err != nil {
 		var se *skipError
 		if errors.As(err, &se) {
@@ -371,17 +446,18 @@ func (a *analyzer) loadConfig(ctx context.Context) (*ModelConfig, []finding.Find
 		return nil, []finding.Finding{{
 			Rule:        RuleConfigInvalid,
 			Severity:    finding.SeverityMedium,
-			Title:       "config.json could not be parsed",
-			Message:     "The model config is not valid JSON; trust_remote_code and auto_map could not be fully evaluated.",
-			File:        "config.json",
+			Title:       name + " could not be parsed",
+			Message:     name + " is not valid JSON; trust_remote_code and auto_map could not be fully evaluated.",
+			File:        name,
 			Remediation: "Inspect the config manually before loading the model.",
 		}}, nil
 	}
 	return cfg, nil, nil
 }
 
-// autoMapTargets resolves auto_map entries for a model repository.
-func (a *analyzer) autoMapTargets(cfg *ModelConfig, findings []finding.Finding) ([]string, []finding.Finding) {
+// autoMapTargets resolves the auto_map entries of one config file of a model
+// repository.
+func (a *analyzer) autoMapTargets(cfg *ModelConfig, file string, findings []finding.Finding) ([]string, []finding.Finding) {
 	if cfg == nil {
 		return nil, findings
 	}
@@ -392,9 +468,22 @@ func (a *analyzer) autoMapTargets(cfg *ModelConfig, findings []finding.Finding) 
 				Rule:        RuleAutoMapBadVal,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map value has unexpected type",
-				Message:     fmt.Sprintf("auto_map[%q] is not a string; the referenced code path could not be resolved.", e.Key),
-				File:        "config.json",
+				Message:     fmt.Sprintf("auto_map[%q] is not a string or a list of strings; the referenced code path could not be resolved.", e.Key),
+				File:        file,
 				Remediation: "Fix the config or inspect the repository manually.",
+			})
+			continue
+		}
+		if repo, remote := RemoteAutoMapRepo(e.Target); remote {
+			findings = append(findings, finding.Finding{
+				Rule:        RuleAutoMapRemote,
+				Severity:    finding.SeverityMedium,
+				Title:       "auto_map loads code from another repository",
+				Message:     fmt.Sprintf("auto_map[%q]=%q makes transformers download and import code from %q; that code is not part of this scan.", e.Key, e.Target, repo),
+				File:        file,
+				Evidence:    e.Target,
+				Remediation: "Scan the referenced repository as well and pin both repositories to reviewed revisions.",
+				References:  []string{"https://huggingface.co/docs/transformers/custom_models"},
 			})
 			continue
 		}
@@ -405,7 +494,7 @@ func (a *analyzer) autoMapTargets(cfg *ModelConfig, findings []finding.Finding) 
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map target rejected",
 				Message:     fmt.Sprintf("auto_map[%q]=%q: %v", e.Key, e.Target, err),
-				File:        "config.json",
+				File:        file,
 				Evidence:    e.Target,
 				Remediation: "An auto_map target must resolve to a plain repository file path. Inspect the config manually.",
 			})
@@ -429,10 +518,10 @@ func (a *analyzer) datasetScripts() ([]string, bool) {
 }
 
 // scanTarget fetches one Python target and runs the static analyzer on it.
-func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Finding, error) {
+func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Finding, []byte, error) {
 	entry, ok := a.fileIndex[path]
 	if !ok {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleAutoMapMiss,
 			Severity:    finding.SeverityMedium,
 			Title:       "auto_map target not present in repository",
@@ -442,7 +531,7 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 		}}
 	}
 	if entry.Size > a.opts.MaxFileBytes {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleLimit,
 			Severity:    finding.SeverityMedium,
 			Title:       "File exceeds analysis size limit",
@@ -454,10 +543,10 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 	data, err := a.fetch(ctx, path, a.opts.MaxFileBytes)
 	if err != nil {
 		if errors.Is(err, errSkipped) {
-			return nil, err
+			return nil, nil, err
 		}
 		if hf.IsNotFound(err) {
-			return nil, &skipError{f: finding.Finding{
+			return nil, nil, &skipError{f: finding.Finding{
 				Rule:        RuleAutoMapMiss,
 				Severity:    finding.SeverityMedium,
 				Title:       "auto_map target not retrievable",
@@ -466,10 +555,10 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 				Remediation: "Inspect the repository before use.",
 			}}
 		}
-		return nil, err
+		return nil, nil, err
 	}
 	if isLFSPointer(data) {
-		return nil, &skipError{f: finding.Finding{
+		return nil, nil, &skipError{f: finding.Finding{
 			Rule:        RuleLFS,
 			Severity:    finding.SeverityMedium,
 			Title:       "Target stored via Git LFS, content not analyzed",
@@ -478,7 +567,7 @@ func (a *analyzer) scanTarget(ctx context.Context, path string) ([]finding.Findi
 			Remediation: "Retrieve and review the object out-of-band if you need assurance.",
 		}}
 	}
-	return AnalyzePython(path, data), nil
+	return AnalyzePython(path, data), data, nil
 }
 
 // fetch downloads one file with limit enforcement. Oversized files surface as

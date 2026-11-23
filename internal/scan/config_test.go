@@ -57,6 +57,43 @@ func TestAutoMapEntriesSortedAndTyped(t *testing.T) {
 	}
 }
 
+// transformers stores tokenizer classes as a [slow, fast] pair where either
+// side may be null; each named class is a module that gets imported.
+func TestAutoMapEntriesExpandLists(t *testing.T) {
+	t.Parallel()
+	cfg, err := ParseConfig([]byte(`{"auto_map": {"AutoTokenizer": ["tok.Slow", null, "tok_fast.Fast", 7], "AutoModel": []}}`))
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	entries := cfg.AutoMapEntries()
+	if len(entries) != 3 {
+		t.Fatalf("want 3 entries, got %+v", entries)
+	}
+	if entries[0].Target != "tok.Slow" || entries[1].Target != "tok_fast.Fast" || entries[0].Invalid || entries[1].Invalid {
+		t.Fatalf("list strings not expanded: %+v", entries)
+	}
+	if !entries[2].Invalid || entries[2].Key != "AutoTokenizer" {
+		t.Fatalf("non-string list element must be invalid: %+v", entries[2])
+	}
+}
+
+func TestRemoteAutoMapRepo(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"org/shared-code--modeling.Model": "org/shared-code",
+		"shared--modeling.Model":          "shared",
+		"modeling.Model":                  "",
+		"pkg.sub-mod.Model":               "",
+		"--modeling.Model":                "",
+	}
+	for in, want := range cases {
+		got, ok := RemoteAutoMapRepo(in)
+		if got != want || ok != (want != "") {
+			t.Errorf("RemoteAutoMapRepo(%q) = %q, %v; want %q", in, got, ok, want)
+		}
+	}
+}
+
 func TestAutoMapEntriesEmpty(t *testing.T) {
 	t.Parallel()
 	var cfg *ModelConfig
@@ -133,31 +170,46 @@ func FuzzParseConfig(f *testing.F) {
 			return
 		}
 		entries := cfg.AutoMapEntries()
-		// AutoMapEntries must mirror auto_map 1:1 and faithfully: an empty
-		// key or empty target is odd input, but it is the config's own data
-		// and is reported as-is (downstream rules handle the consequences).
-		if len(entries) != len(cfg.AutoMap) {
-			t.Fatalf("%d entries for %d auto_map keys", len(entries), len(cfg.AutoMap))
-		}
-		byKey := make(map[string]AutoMapEntry, len(entries))
+		// AutoMapEntries must mirror auto_map faithfully: a string is one
+		// entry, a list is one entry per non-null element (non-strings are
+		// invalid), anything else is one invalid entry. An empty key or
+		// empty target is the config's own data and is reported as-is.
+		byKey := make(map[string][]AutoMapEntry, len(entries))
 		for _, e := range entries {
-			byKey[e.Key] = e
+			byKey[e.Key] = append(byKey[e.Key], e)
 		}
+		total := 0
 		for k, raw := range cfg.AutoMap {
-			e, ok := byKey[k]
-			if !ok {
-				t.Fatalf("missing entry for key %q", k)
-			}
-			if s, isString := raw.(string); isString {
-				if e.Invalid {
-					t.Fatalf("entry %q wrongly marked invalid", k)
+			var want []AutoMapEntry
+			switch v := raw.(type) {
+			case string:
+				want = []AutoMapEntry{{Key: k, Target: v}}
+			case []any:
+				for _, el := range v {
+					switch s := el.(type) {
+					case nil:
+					case string:
+						want = append(want, AutoMapEntry{Key: k, Target: s})
+					default:
+						want = append(want, AutoMapEntry{Key: k, Invalid: true})
+					}
 				}
-				if e.Target != s {
-					t.Fatalf("entry %q target = %q, want %q", k, e.Target, s)
-				}
-			} else if !e.Invalid {
-				t.Fatalf("entry %q for non-string value must be invalid", k)
+			default:
+				want = []AutoMapEntry{{Key: k, Invalid: true}}
 			}
+			got := byKey[k]
+			if len(got) != len(want) {
+				t.Fatalf("key %q: %d entries, want %d", k, len(got), len(want))
+			}
+			for i := range want {
+				if got[i] != want[i] {
+					t.Fatalf("key %q entry %d = %+v, want %+v", k, i, got[i], want[i])
+				}
+			}
+			total += len(want)
+		}
+		if len(entries) != total {
+			t.Fatalf("%d entries, want %d", len(entries), total)
 		}
 	})
 }

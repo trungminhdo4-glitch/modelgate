@@ -2,7 +2,8 @@
 
 ModelGate is a **static, read-only supply-chain checker for Hugging Face
 repositories**. It downloads a repository's metadata, file tree, `config.json`
-and the Python files referenced by `auto_map` using HTTP **GET requests only**,
+and the Python files referenced by `auto_map` (plus the relative imports those
+files pull in, as `transformers` loads them) using HTTP **GET requests only**,
 matches them against a catalogue of static detection rules, and reports what it
 finds — as human-readable text, JSON, Sigma or SARIF — plus an optional
 CycloneDX 1.6 SBOM and a commit-pin delta report.
@@ -45,8 +46,10 @@ Scope of the analysis (v0.1):
 | Surface | What is checked |
 | --- | --- |
 | `config.json` | `trust_remote_code`, `auto_map` entry points, malformed values |
+| `tokenizer_config.json`, `preprocessor_config.json`, `processor_config.json` | `auto_map` entry points (including `[slow, fast]` tokenizer pairs), as `AutoTokenizer`/`AutoProcessor` load them |
+| Cross-repository `auto_map` (`org/repo--module.Class`) | reported as code that is loaded from another repository and not covered by the scan |
 | Repository tree | bounded pagination, traversal/absolute paths, size and file-count limits, unexpected entry types |
-| Python sources | 13 static rules across command execution, dynamic evaluation, obfuscation, networking, unsafe deserialization, dependency confusion |
+| Python sources | `auto_map` targets and, recursively, their relative imports (`from .x import`), under the same file limit; 13 static rules across command execution, dynamic evaluation, obfuscation, networking, unsafe deserialization, dependency confusion |
 | Model card | documented `trust_remote_code` usage |
 | Dataset repos | presence of executable loading scripts |
 | Pinning | delta report between an approved commit SHA and the current revision |

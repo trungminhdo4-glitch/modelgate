@@ -9,6 +9,29 @@ signing and support policy.
 
 ## [Unreleased]
 
+### Security
+
+* `auto_map` coverage now matches what `transformers` loads:
+  * `tokenizer_config.json`, `preprocessor_config.json` and
+    `processor_config.json` are read too (AutoTokenizer, AutoImageProcessor,
+    AutoProcessor); before, their remote code was never analyzed.
+  * List values such as `"AutoTokenizer": ["tok.Slow", "tok_fast.Fast"]`
+    (a `null` side is skipped) resolve to each named module instead of
+    `MG-CFG-002` "unexpected type".
+  * A cross-repository reference `org/repo--module.Class` raises the new
+    `MG-AUTO-002` (medium): the code comes from another repository and is not
+    covered by the scan. Before it surfaced only as a missing local file.
+* Python files pulled in by relative imports of an `auto_map` module
+  (`from .helpers import x`, recursively) are now analyzed as well.
+  `transformers` downloads and runs them with `trust_remote_code`, so a
+  payload one import away from the `auto_map` target was previously missed.
+  They count against the same analysis file limit (64 files).
+* SARIF artifact locations are valid relative URIs (percent-encoded, `\` to
+  `/`, `:` escaped) instead of raw file paths.
+* Repository file paths are validated per segment: dotted names such as
+  `weights..bin` no longer abort the scan, while `./x`, `a//b` and a leading
+  `\` are rejected.
+
 ### Fixed
 
 * `modelgate rules` rejects unexpected positional arguments instead of
