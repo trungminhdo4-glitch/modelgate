@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -26,7 +27,7 @@ func (r *Report) SARIF() ([]byte, error) {
 		}
 		if f.File != "" {
 			loc := sarifLocation{PhysicalLocation: sarifPhysical{
-				ArtifactLocation: sarifArtifact{URI: f.File},
+				ArtifactLocation: sarifArtifact{URI: sarifURI(f.File)},
 			}}
 			if f.Line > 0 {
 				loc.PhysicalLocation.Region = &sarifRegion{StartLine: f.Line}
@@ -94,6 +95,18 @@ func collectRules(fs []finding.Finding) []sarifRule {
 		out = append(out, rule)
 	}
 	return out
+}
+
+// sarifURI turns a repository-relative file path into a relative URI
+// reference as SARIF 2.1.0 requires (§3.4.3, RFC 3986). Backslashes become
+// '/', every segment is percent-encoded, and ':' is always escaped so the
+// first segment can never be read as a URI scheme.
+func sarifURI(p string) string {
+	segments := strings.Split(strings.ReplaceAll(p, `\`, "/"), "/")
+	for i, s := range segments {
+		segments[i] = strings.ReplaceAll(url.PathEscape(s), ":", "%3A")
+	}
+	return strings.Join(segments, "/")
 }
 
 func sanitizeRuleName(s string) string {

@@ -98,6 +98,43 @@ func TestSARIFDeterministic(t *testing.T) {
 	}
 }
 
+// Artifact locations must be valid relative URI references (SARIF 2.1.0
+// §3.4.3, RFC 3986): a raw '#' would turn into a fragment, a raw '%' into a
+// broken escape, and a ':' in the first segment into a scheme.
+func TestSARIFArtifactURIIsValidReference(t *testing.T) {
+	t.Parallel()
+	cases := map[string]string{
+		"x.py":                       "x.py",
+		"sub dir/model.bin":          "sub%20dir/model.bin",
+		"weights#v2.pt":              "weights%23v2.pt",
+		"100%/a?.pkl":                "100%25/a%3F.pkl",
+		`win\path\model.pkl`:         "win/path/model.pkl",
+		"c:model.pkl":                "c%3Amodel.pkl",
+		"ünïcode/модель.safetensors": "%C3%BCn%C3%AFcode/%D0%BC%D0%BE%D0%B4%D0%B5%D0%BB%D1%8C.safetensors",
+	}
+	for in, want := range cases {
+		if got := sarifURI(in); got != want {
+			t.Errorf("sarifURI(%q) = %q, want %q", in, got, want)
+		}
+	}
+
+	rep := build(t, fixtureResult(finding.Finding{
+		Rule: "R", Severity: finding.SeverityHigh, Title: "T", Message: "m",
+		File: "weights#v2.pt", Evidence: "e",
+	}), finding.SeverityHigh)
+	data, err := rep.SARIF()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var log sarifLog
+	if err := json.Unmarshal(data, &log); err != nil {
+		t.Fatal(err)
+	}
+	if got := log.Runs[0].Results[0].Locations[0].PhysicalLocation.ArtifactLocation.URI; got != "weights%23v2.pt" {
+		t.Fatalf("artifact uri = %q", got)
+	}
+}
+
 func TestSanitizeRuleName(t *testing.T) {
 	t.Parallel()
 	if got := sanitizeRuleName("Shell command (os)"); got != "Shell_command__os_" {
