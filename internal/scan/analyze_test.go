@@ -365,6 +365,44 @@ func TestAnalyzeAutoMapListsAuxConfigsAndRemoteRefs(t *testing.T) {
 	}
 }
 
+func TestAnalyzeCustomPipelines(t *testing.T) {
+	rev := "fff012345678901234567890123456789012345"
+	srv := synth(t, testserver.Config{
+		ID:      "fixture/pipelines",
+		Current: rev,
+		Revisions: map[string][]testserver.File{
+			rev: {
+				{Path: "config.json", Content: []byte(`{"custom_pipelines": {"my-task": {"impl": "pipeline.MyPipeline", "pt": ["AutoModel"]}, "other": {"impl": "org/elsewhere--pipe.P"}, "broken": {"pt": []}}}`)},
+				{Path: "pipeline.py", Content: []byte("import os\nos.system('id')\n")},
+			},
+		},
+	})
+	res, err := Analyze(context.Background(), fetcher(t, srv), Options{RepoID: "fixture/pipelines"})
+	if err != nil {
+		t.Fatalf("analyze: %v", err)
+	}
+	if got := strings.Join(res.AnalyzedFiles, ","); got != "pipeline.py" {
+		t.Fatalf("analyzed files = %q", got)
+	}
+	var cmd, remote, bad bool
+	for _, f := range res.Findings {
+		switch {
+		case f.Rule == "MG-CMD-001" && f.File == "pipeline.py":
+			cmd = true
+		case f.Rule == RuleAutoMapRemote:
+			remote = strings.Contains(f.Message, "org/elsewhere") && strings.Contains(f.Message, "custom_pipelines.other")
+		case f.Rule == RuleAutoMapBadVal:
+			bad = strings.Contains(f.Message, "custom_pipelines.broken")
+		}
+	}
+	if !cmd || !remote || !bad {
+		t.Fatalf("cmd=%v remote=%v bad=%v findings=%+v", cmd, remote, bad, res.Findings)
+	}
+	if res.Trust.AutoMapCount != 3 {
+		t.Fatalf("entry point count = %d, want 3", res.Trust.AutoMapCount)
+	}
+}
+
 func TestAnalyzeRelativeImportsRespectFileLimit(t *testing.T) {
 	rev := "ddd012345678901234567890123456789012345"
 	srv := synth(t, testserver.Config{

@@ -24,6 +24,49 @@ type ModelConfig struct {
 	// AutoMap maps transformers entry points (e.g. "AutoModel") to the
 	// Python file/class that must be downloaded and imported to use them.
 	AutoMap map[string]any `json:"auto_map"`
+	// CustomPipelines maps a pipeline task to its definition; the "impl"
+	// class is imported by pipeline(..., trust_remote_code=True).
+	CustomPipelines map[string]any `json:"custom_pipelines"`
+}
+
+// PipelineEntries returns one entry per custom_pipelines task, sorted by
+// task, keyed "custom_pipelines.<task>". A task without a string "impl" is
+// invalid: transformers refuses it, and its code path cannot be resolved.
+func (c *ModelConfig) PipelineEntries() []AutoMapEntry {
+	if c == nil || len(c.CustomPipelines) == 0 {
+		return nil
+	}
+	tasks := make([]string, 0, len(c.CustomPipelines))
+	for task := range c.CustomPipelines {
+		tasks = append(tasks, task)
+	}
+	sortStrings(tasks)
+	out := make([]AutoMapEntry, 0, len(tasks))
+	for _, task := range tasks {
+		key := "custom_pipelines." + task
+		def, _ := c.CustomPipelines[task].(map[string]any)
+		impl, ok := def["impl"].(string)
+		if !ok {
+			out = append(out, AutoMapEntry{Key: key, Invalid: true})
+			continue
+		}
+		out = append(out, AutoMapEntry{Key: key, Target: impl})
+	}
+	return out
+}
+
+// entryPoints is every remote-code entry point of one config file:
+// auto_map entries followed by custom_pipelines implementations.
+func (c *ModelConfig) entryPoints() []AutoMapEntry {
+	return append(c.AutoMapEntries(), c.PipelineEntries()...)
+}
+
+// entryLabel names an entry in finding messages.
+func entryLabel(e AutoMapEntry) string {
+	if strings.HasPrefix(e.Key, "custom_pipelines.") {
+		return e.Key + ".impl"
+	}
+	return fmt.Sprintf("auto_map[%q]", e.Key)
 }
 
 // AutoMapEntry is one resolved view of an auto_map value.

@@ -18,6 +18,9 @@ signing and support policy.
   * List values such as `"AutoTokenizer": ["tok.Slow", "tok_fast.Fast"]`
     (a `null` side is skipped) resolve to each named module instead of
     `MG-CFG-002` "unexpected type".
+  * `custom_pipelines[task].impl` in `config.json`, which
+    `pipeline(..., trust_remote_code=True)` imports, is analyzed like an
+    `auto_map` target; a task without `impl` raises `MG-CFG-002`.
   * A cross-repository reference `org/repo--module.Class` raises the new
     `MG-AUTO-002` (medium): the code comes from another repository and is not
     covered by the scan. Before it surfaced only as a missing local file.
