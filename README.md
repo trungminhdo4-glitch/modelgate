@@ -165,7 +165,7 @@ files, no telemetry.
 
 ```console
 modelgate check <repo-id> [flags]   read-only security check of one repository
-modelgate rules [--format json]     list the static pattern rules
+modelgate rules [flags]             list or filter the static pattern rules
 modelgate version                   print the version
 ```
 
@@ -181,6 +181,25 @@ Important flags for `check`:
 | `--out` / `--sbom` | — | **the only** filesystem writes; use distinct files when supplying both flags |
 | `--api-url` | `https://huggingface.co` | Hugging Face compatible API base URL (GET only) |
 | `--timeout` | `30s` | shared deadline for repository analysis, including pinned revision checks (positive duration such as `500ms` or `2m`) |
+
+### Explore the rule catalogue offline
+
+```console
+modelgate rules --min-severity high
+modelgate rules --id MG-CMD-001 --format json
+```
+
+`rules` reads the built-in static pattern catalogue without network access.
+`--id` selects one exact, case-sensitive rule ID. `--min-severity` includes
+rules at or above `info`, `low`, `medium`, `high` or `critical` (default:
+`info`). The filters combine with AND and work with both text and JSON;
+JSON retains the full rule details, including remediation and references.
+A valid combination with no matches returns an empty list (`[]` in JSON)
+and exit 0. Unknown or empty IDs, invalid severities and positional arguments
+return exit 2. Filtering the catalogue does not change which rules `check`
+evaluates.
+
+### Check exit codes and CI integration
 
 Exit codes: **0** — no findings at or above `--fail-on`;
 **1** — findings at or above `--fail-on` (a `WARNING:` line is printed);

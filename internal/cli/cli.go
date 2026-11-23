@@ -89,7 +89,7 @@ func (a *App) usage() {
 
 Usage:
   modelgate check <repo-id> [flags]   read-only security check of one repository
-  modelgate rules [--format json]     list the static pattern rules
+  modelgate rules [flags]             list or filter the static pattern rules
   modelgate version                   print the version
 
 Run "modelgate check -h" for check flags.
@@ -248,8 +248,10 @@ func (a *App) cmdRules(args []string) int {
 	fs := flag.NewFlagSet("rules", flag.ContinueOnError)
 	fs.SetOutput(a.Err)
 	format := fs.String("format", "text", "output format: text or json")
+	id := fs.String("id", "", "select one exact rule ID (for example MG-CMD-001)")
+	minSeverityStr := fs.String("min-severity", "info", "minimum severity: info, low, medium, high or critical")
 	fs.Usage = func() {
-		fmt.Fprintln(a.Err, "usage: modelgate rules [--format text|json]")
+		fmt.Fprintln(a.Err, "usage: modelgate rules [--format text|json] [--id ID] [--min-severity LEVEL]")
 		fs.PrintDefaults()
 	}
 	if err := fs.Parse(splitArgs(fs, args)); err != nil {
@@ -258,7 +260,41 @@ func (a *App) cmdRules(args []string) int {
 		}
 		return ExitError
 	}
-	rules := scan.Rules()
+	if fs.NArg() != 0 {
+		fmt.Fprintln(a.Err, "modelgate rules: does not accept positional arguments")
+		return ExitError
+	}
+	hasID := false
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "id" {
+			hasID = true
+		}
+	})
+	minSeverity, err := finding.ParseSeverity(*minSeverityStr)
+	if err != nil {
+		fmt.Fprintf(a.Err, "modelgate rules: --min-severity: %v\n", err)
+		return ExitError
+	}
+	rules := make([]scan.RuleInfo, 0)
+	idFound := !hasID
+	for _, rule := range scan.Rules() {
+		if hasID && rule.ID != *id {
+			continue
+		}
+		idFound = true
+		matches, err := rule.Severity.AtLeast(minSeverity)
+		if err != nil {
+			fmt.Fprintf(a.Err, "modelgate rules: %v\n", err)
+			return ExitError
+		}
+		if matches {
+			rules = append(rules, rule)
+		}
+	}
+	if !idFound {
+		fmt.Fprintf(a.Err, "modelgate rules: unknown rule ID %q\n", *id)
+		return ExitError
+	}
 	switch *format {
 	case "text":
 		for _, r := range rules {
