@@ -12,6 +12,9 @@ sbom.cdx.json
 *.prof
 *.fuzz
 
+# Local commit-hook audit data
+/.safegit/audit.jsonl
+
 # Secrets — never commit
 .env
 .env.*
