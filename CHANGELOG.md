@@ -11,6 +11,18 @@ signing and support policy.
 
 ### Security
 
+* `MG-DESER-001` covers the whole pickle family and other code-executing
+  loaders, not just `pickle.load(s)`, `marshal.loads` and `shelve.open`:
+  `marshal.load`, `dill`, `cloudpickle`, `joblib.load`, `jsonpickle.decode`,
+  `pandas.read_pickle`, `numpy.load(..., allow_pickle=True)`,
+  `pickle.Unpickler`, and `yaml.load`/`yaml.load_all` without a
+  `SafeLoader`/`CSafeLoader`/`BaseLoader` (plus `yaml.unsafe_load`).
+  Aliased imports (`import joblib as jl`) and imported functions
+  (`from dill import load`, `from pickle import loads as f`, `import *`) are
+  resolved too. `json.load`, `yaml.safe_load`, `numpy.load` without
+  `allow_pickle=True` and method calls such as `self.load()` stay quiet.
+* `MG-DESER-002` no longer fires on `torch.load(..., weights_only=True)`
+  (false positive) and now also sees `from torch import load` and aliases.
 * `auto_map` coverage now matches what `transformers` loads:
   * `tokenizer_config.json`, `preprocessor_config.json` and
     `processor_config.json` are read too (AutoTokenizer, AutoImageProcessor,

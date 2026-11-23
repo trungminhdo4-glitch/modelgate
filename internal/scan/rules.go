@@ -22,6 +22,7 @@ type pyRule struct {
 	Structural  []*regexp.Regexp
 	Raw         []*regexp.Regexp
 	Filter      func(src []byte, start int) bool
+	Loaders     []loader // deserialization calls, see loaders.go
 	Remediation string
 	References  []string
 	Keywords    []string
@@ -173,25 +174,25 @@ var pyRules = []pyRule{
 	},
 	{
 		ID:       "MG-DESER-001",
-		Title:    "Unsafe deserialization (pickle/marshal/shelve)",
+		Title:    "Unsafe deserialization (pickle family, marshal, shelve, unsafe YAML)",
 		Severity: finding.SeverityHigh,
-		Structural: []*regexp.Regexp{
-			regexp.MustCompile(`\b(?:c?Pickle|pickle)\.loads?\s*\(`),
-			regexp.MustCompile(`\bmarshal\.loads\s*\(`),
-			regexp.MustCompile(`\bshelve\.open\s*\(`),
+		Loaders:  deser001Loaders,
+		Remediation: "Pickle-family loaders (pickle, dill, cloudpickle, joblib, jsonpickle, pandas.read_pickle, numpy.load with allow_pickle=True), " +
+			"marshal, shelve and yaml.load without SafeLoader can execute arbitrary code from the input. " +
+			"Load weights with safe formats (safetensors, yaml.safe_load) or verify signatures first.",
+		References: []string{"https://cwe.mitre.org/data/definitions/502.html"},
+		Keywords: []string{
+			"pickle.loads(", "pickle.load(", "marshal.loads(", "marshal.load(",
+			"joblib.load(", "dill.load(", "dill.loads(", "cloudpickle.load(", "cloudpickle.loads(",
+			"jsonpickle.decode(", "read_pickle(", "shelve.open(", "yaml.unsafe_load(",
 		},
-		Remediation: "Pickle-family loaders can execute arbitrary code from the file. Load weights with safe formats or verify signatures first.",
-		References:  []string{"https://cwe.mitre.org/data/definitions/502.html"},
-		Keywords:    []string{"pickle.loads(", "marshal.loads(", "shelve.open("},
-		Attack:      []string{"attack.t1562.001"},
+		Attack: []string{"attack.t1562.001"},
 	},
 	{
-		ID:       "MG-DESER-002",
-		Title:    "torch.load without safe weights loading",
-		Severity: finding.SeverityMedium,
-		Structural: []*regexp.Regexp{
-			regexp.MustCompile(`\btorch\.load\s*\(`),
-		},
+		ID:          "MG-DESER-002",
+		Title:       "torch.load without safe weights loading",
+		Severity:    finding.SeverityMedium,
+		Loaders:     deser002Loaders,
 		Remediation: "Call torch.load(..., weights_only=True) so pickled code paths are not reachable.",
 		References:  []string{"https://cwe.mitre.org/data/definitions/502.html"},
 		Keywords:    []string{"torch.load("},
@@ -351,6 +352,11 @@ func matchRule(rule pyRule, src, masked []byte) (int, int) {
 	for _, re := range rule.Raw {
 		for _, loc := range re.FindAllIndex(src, -1) {
 			consider(loc[0])
+		}
+	}
+	if len(rule.Loaders) > 0 {
+		for _, idx := range loaderCallSites(masked, rule.Loaders) {
+			consider(idx)
 		}
 	}
 	return count, first
