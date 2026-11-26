@@ -9,6 +9,13 @@ signing and support policy.
 
 ## [Unreleased]
 
+### Added
+
+* Metadata-only `MG-ARTIFACT-001` review notices for checkpoint filenames that
+  may use pickle serialization, including standard PyTorch weight shards. No
+  weight contents are downloaded or deserialized. Notices use low severity and
+  flow through the existing reports and pin comparisons.
+
 ### Security
 
 * `MG-DESER-001` covers the whole pickle family and other code-executing

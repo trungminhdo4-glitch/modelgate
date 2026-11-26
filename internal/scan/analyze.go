@@ -242,6 +242,7 @@ func (a *analyzer) run(ctx context.Context) (files []string, findings []finding.
 		return nil, nil, trust, nil, err
 	}
 	findings = append(findings, cfgFindings...)
+	findings = append(findings, a.checkpointFormatFindings()...)
 
 	// auto_map sources: config.json, plus the tokenizer and processor
 	// configs of a model repository.

@@ -49,6 +49,7 @@ Scope of the analysis (v0.1):
 | `tokenizer_config.json`, `preprocessor_config.json`, `processor_config.json` | `auto_map` entry points (including `[slow, fast]` tokenizer pairs), as `AutoTokenizer`/`AutoProcessor` load them |
 | Cross-repository `auto_map` (`org/repo--module.Class`) | reported as code that is loaded from another repository and not covered by the scan |
 | Repository tree | bounded pagination, traversal/absolute paths, size and file-count limits, unexpected entry types |
+| Checkpoint filenames | metadata-only review notices for pickle-capable naming conventions; artifacts are never downloaded or deserialized |
 | Python sources | `auto_map` targets and, recursively, their relative imports (`from .x import`), under the same file limit; 13 static rules across command execution, dynamic evaluation, obfuscation, networking, unsafe deserialization, dependency confusion |
 | Model card | documented `trust_remote_code` usage |
 | Dataset repos | presence of executable loading scripts |
@@ -57,6 +58,30 @@ Scope of the analysis (v0.1):
 What ModelGate deliberately does **not** do: execute code, import the model,
 reach out to anything other than the configured API endpoint, mutate the remote
 repository, or write to disk unless you explicitly pass `--out` / `--sbom`.
+
+### Checkpoint serialization review
+
+`MG-ARTIFACT-001` reports a **low-severity manual-review notice** for `.pkl`,
+`.pickle`, `.pt`, `.pth`, `.ckpt`, `pytorch_model.bin`, and numbered
+`pytorch_model-00001-of-00002.bin` shards, including nested paths. Matching is
+case-insensitive. This helps reviewers see a serialization surface even when a
+repository has no custom Python entry points. It applies to models and datasets.
+
+The notice uses the existing file tree, makes no artifact-content requests, and
+does not count weights as analyzed Python files. JSON, text, SARIF, and
+pin-delta reports carry the finding through the existing report interfaces. The
+default `--fail-on high` policy is unchanged; use `--fail-on low` to gate it.
+
+A filename does not prove the actual serialization format, unsafe loader options,
+or malicious content. The rule does not inspect pickle instructions, determine
+which artifact a framework will choose, or suppress notices merely because a
+`.safetensors` alternative is present. Generic `.bin` names are deliberately
+excluded. A non-match is not a safety verdict. Review your loader's configuration
+and prefer suitable safetensors artifacts; see Hugging Face's
+[pickle-scanning guidance](https://huggingface.co/docs/hub/en/security-pickle) and
+[serialization guidance](https://huggingface.co/docs/safetensors/convert-weights).
+The `rules` command and Sigma export remain a catalogue of Python source
+patterns; this repository-metadata notice is not part of that catalogue.
 
 ## Dual-Use
 
